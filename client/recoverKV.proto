@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package recoverKV;
+
+// Defines the service
+service RecoverKV {
+    // Function invoked to send the request
+    rpc sendRequest (Request) returns (Response) {}
+}
+
+// The request message containing key
+message Request {
+    string key = 1;
+    string value = 2;
+}
+
+// The response message containing response
+message Response {
+    string value = 1;
+    int32 successCode = 2;
+}
