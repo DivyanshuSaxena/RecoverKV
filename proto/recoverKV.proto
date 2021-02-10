@@ -4,8 +4,11 @@ package recoverKV;
 
 // Defines the service
 service RecoverKV {
-    // Function invoked to send the request
-    rpc sendRequest (Request) returns (Response) {}
+    // Function invoked for fetching value
+    rpc getValue (Request) returns (Response) {}
+
+    // Function invoked for fetching value
+    rpc setValue (Request) returns (Response) {}
 }
 
 // The request message containing key
