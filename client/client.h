@@ -17,15 +17,15 @@ using namespace std;
 
 // Stub class for overriding proto
 class RecoverKVClient {
-    public:
+	public:
 
-        RecoverKVClient(std::shared_ptr<Channel> channel) : stub_(RecoverKV::NewStub(channel)) {}
+		RecoverKVClient(std::shared_ptr<Channel> channel) : stub_(RecoverKV::NewStub(channel)) {}
 
-        int getValue(char *key, char *value);
-        int setValue(char *key, char *value, char *old_value);
+		int getValue(char *key, char *value);
+		int setValue(char *key, char *value, char *old_value);
 
-    private:
-        std::unique_ptr<RecoverKV::Stub> stub_;
+	private:
+		std::unique_ptr<RecoverKV::Stub> stub_;
 };
 
 // Client callable methods
