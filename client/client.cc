@@ -48,7 +48,6 @@ int RecoverKVClient::setValue(char *key, char *value, char *old_value) {
 		int successCode = response.successcode();
 
 		// if old value existed for this key
-		// TODO: one byte larger?
 		if (successCode == 0){
 			
 			copy(response.value().begin(), response.value().end(), old_value);
@@ -69,6 +68,10 @@ KV739Client::KV739Client() {
 	client = NULL;
 }
 
+// Destructor for clean up
+KV739Client::~KV739Client() {
+	this->kv739_shutdown();
+}
 
 // Establish grpc connection with the server
 int KV739Client::kv739_init(char *server_name) {

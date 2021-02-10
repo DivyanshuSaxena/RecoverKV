@@ -36,7 +36,7 @@ client.o: client.cc
 	protoc -I $(PROTOS_PATH) --cpp_out=. $<
 
 test: sample_test.cc
-	$(CXX) $< -L. -l :lib739kv.so -Wl,-rpath=. -o $@
+	$(CXX) $< -L. -l739kv -Wl,-rpath=. -o $@
 
 clean:
-	rm -f *.o *.pb.cc *.pb.h test
+	rm -f *.o *.pb.cc test
