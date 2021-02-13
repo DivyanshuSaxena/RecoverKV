@@ -3,8 +3,10 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 
@@ -27,7 +29,7 @@ type server struct {
 // 				 ("", 1) if the key is absent
 func (s *server) getValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
-	log.Printf("Received: %v", key)
+	log.Printf("Received: %v\n", key)
 
 	var successCode int32 = 0
 	val, prs := table[key]
@@ -44,7 +46,7 @@ func (s *server) getValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 func (s *server) setValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	newVal := in.GetValue()
-	log.Printf("Received: %v", key)
+	log.Printf("Received: %v\n", key)
 
 	var successCode int32 = 0
 	val, prs := table[key]
@@ -58,15 +60,25 @@ func (s *server) setValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 }
 
 func main() {
+	fmt.Println("Starting server execution")
+
+	// If the file doesn't exist, create it or append to the file
+	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.SetOutput(file)
+
 	// Start the server and listen for requests
 	lis, err := net.Listen("tcp", port)
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		log.Fatalf("Failed to listen: %v\n", err)
 	}
 	s := grpc.NewServer()
 	pb.RegisterRecoverKVServer(s, &server{})
+	fmt.Println("Server started successfully")
+
 	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+		log.Fatalf("Failed to serve: %v\n", err)
 	}
-	log.Printf("Started server successfully")
 }

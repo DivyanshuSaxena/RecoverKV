@@ -42,5 +42,9 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# Custom Added Go Executables
+# Executables
 server/recoverKV
+client/*test
+
+# Ignore Log files
+*.log

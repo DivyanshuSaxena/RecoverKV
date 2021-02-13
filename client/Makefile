@@ -3,7 +3,7 @@ LDFLAGS += -L/usr/local/lib `pkg-config --libs protobuf grpc++ grpc`\
            -ldl
 
 CXX = g++
-CPPFLAGS += `pkg-config --cflags protobuf grpc`
+CXXFLAGS += `pkg-config --cflags protobuf grpc`
 CXXFLAGS += -std=c++11
 
 GRPC_CPP_PLUGIN = grpc_cpp_plugin
@@ -38,10 +38,10 @@ client.o: client.cc
 test: performance_test correctness_test
 
 performance_test: tests/performance_test.cc
-	$(CXX) $< -L. -l739kv -Wl,-rpath=. -o $@
+	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
 
 correctness_test: tests/correctness_test.cc
-	$(CXX) $< -L. -l739kv -Wl,-rpath=. -o $@
+	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
 
 clean:
 	rm -f *.o *.pb.cc *_test
