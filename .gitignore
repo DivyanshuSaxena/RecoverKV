@@ -45,3 +45,6 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+
+# Custom Added Go Executables
+server/recoverKV
