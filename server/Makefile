@@ -1,8 +1,18 @@
-# Initiate module
-go mod init recoverKV
+all: init protoc build
 
-# Generate the protobuf files using the ../proto directory
-protoc -I=../proto --go_out=. --go-grpc_out=. recoverKV.proto
+gen: protoc build
 
-# Build main file
-go build
+init:
+	go mod init recoverKV
+
+protoc:
+	# Generate the protobuf files using the ../proto directory
+	protoc -I=../proto --go_out=. --go-grpc_out=. recoverKV.proto
+
+build:
+	# Build main file
+	go build
+
+clean:
+	rm -r gen
+	rm recoverKV
