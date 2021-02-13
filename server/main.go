@@ -24,10 +24,10 @@ type server struct {
 	pb.UnimplementedRecoverKVServer
 }
 
-// getValue implements RecoverKV.getValue
+// GetValue implements RecoverKV.GetValue
 // Returns (val, 0) if the key is found
 // 				 ("", 1) if the key is absent
-func (s *server) getValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	log.Printf("Received: %v\n", key)
 
@@ -40,10 +40,10 @@ func (s *server) getValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
 
-// setValue implements RecoverKV.setValue
+// SetValue implements RecoverKV.SetValue
 // Returns (old_value, 0) if key present
 // 				 (new_value, 1) if key absent
-func (s *server) setValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	newVal := in.GetValue()
 	log.Printf("Received: %v\n", key)
@@ -70,7 +70,7 @@ func main() {
 	log.SetOutput(file)
 
 	// Start the server and listen for requests
-	lis, err := net.Listen("tcp", port)
+	lis, err := net.Listen("tcp", "localhost"+port)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
