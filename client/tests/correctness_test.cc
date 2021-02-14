@@ -24,7 +24,7 @@ int test_correctness_single_write_and_read(KV739Client *client, int total_reques
 	char oldValues[total_requests][VALUE_SIZE] = {0};
 	for (int i = 0; i < total_requests; i++) {
 		sprintf(keys[i], "%d-%d", processID, i % total_requests);
-		sprintf(newValues[i], "%x-%x", processID, i / total_requests);
+		sprintf(newValues[i], "%x-%x-%d", processID, i / total_requests, 1);
 	}
 
 	// send write requests to server
@@ -68,7 +68,7 @@ int test_correctness_write_intensive(KV739Client *client, int total_requests, in
 	char oldValues[total_requests][VALUE_SIZE] = {0};
 	for (int i = 0; i < total_requests * total_cycles; i++) {
 		sprintf(keys[i % total_requests], "%d-%d", processID, i % total_requests);
-		sprintf(newValues[i], "%x-%x", processID, i / total_requests);
+		sprintf(newValues[i], "%x-%x-%d", processID, i / total_requests, 2);
 	}
 
 	// send write requests to server
@@ -113,7 +113,7 @@ int test_correctness_read_intensive(KV739Client *client, int total_requests, int
 	char oldValues[total_requests * total_cycles][VALUE_SIZE] = {0};
 	for (int i = 0; i < total_requests; i++) {
 		sprintf(keys[i], "%d-%d", processID, i);
-		sprintf(newValues[i], "%x-%x", processID, i / total_requests);
+		sprintf(newValues[i], "%x-%x-%d", processID, i / total_requests, 3);
 	}
 
 	// send write requests to server
@@ -158,7 +158,7 @@ int test_correctness_durability(KV739Client *client, int total_requests) {
 	char oldValues[total_requests][VALUE_SIZE] = {0};
 	for (int i = 0; i < total_requests; i++) {
 		sprintf(keys[i], "%d-%d", processID, i % total_requests);
-		sprintf(newValues[i], "%x-%x", processID, i / total_requests);
+		sprintf(newValues[i], "%x-%x-%d", processID, i / total_requests, 4);
 	}
 
 	// send write requests to server
@@ -230,11 +230,11 @@ int main(int argc, char *argv[]) {
 	cout << "-----------------------------------------" << endl;
 
 	// multiple overallaping writes followed by reads
-	tests_passed += test_correctness_write_intensive(client, 1000, 1);
+	tests_passed += test_correctness_write_intensive(client, 1000, 3);
 	cout << "-----------------------------------------" << endl;
 
 	// single writes followed by multiple reads
-	tests_passed += test_correctness_read_intensive(client, 1000, 1);
+	tests_passed += test_correctness_read_intensive(client, 1000, 3);
 	cout << "-----------------------------------------" << endl;
 
 	// check server failure and data durability

@@ -45,12 +45,13 @@ func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	newVal := in.GetValue()
-	log.Printf("SetValue Received: %v\n", key)
+	log.Printf("SetValue Received: %v:%v\n", key, newVal)
 
 	var successCode int32 = 0
 	val, prs := table[key]
+	table[key] = newVal
+	
 	if !prs {
-		table[key] = newVal
 		val = newVal
 		successCode = 1
 	}
