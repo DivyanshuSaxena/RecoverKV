@@ -1,4 +1,3 @@
-// Package main implements a server for Greeter service.
 package main
 
 import (
@@ -29,7 +28,7 @@ type server struct {
 // 				 ("", 1) if the key is absent
 func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
-	log.Printf("Received: %v\n", key)
+	log.Printf("GetValue Received: %v\n", key)
 
 	var successCode int32 = 0
 	val, prs := table[key]
@@ -46,7 +45,7 @@ func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	newVal := in.GetValue()
-	log.Printf("Received: %v\n", key)
+	log.Printf("SetValue Received: %v\n", key)
 
 	var successCode int32 = 0
 	val, prs := table[key]
@@ -76,7 +75,7 @@ func main() {
 	}
 	s := grpc.NewServer()
 	pb.RegisterRecoverKVServer(s, &server{})
-	fmt.Println("Server started successfully")
+	fmt.Println("Server started successfully on port"+port)
 
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v\n", err)
