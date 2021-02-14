@@ -6,9 +6,8 @@ import (
 	"log"
 	"net"
 	"os"
-
 	"google.golang.org/grpc"
-
+	"database/sql"
 	pb "recoverKV/gen/recoverKV"
 )
 
@@ -16,8 +15,9 @@ const (
 	port = ":50051"
 )
 
-var table = make(map[string]string)
-
+type BigMAP map[string]string
+var table = make(BigMAP)
+var db *sql.DB
 // server is used to implement RecoverKV service.
 type server struct {
 	pb.UnimplementedRecoverKVServer
@@ -54,9 +54,33 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 	if !prs {
 		val = newVal
 		successCode = 1
+		go InsertKey(key, newVal, db)
+	} else {
+		go deleteAndInsert(key, newVal, db)
 	}
-
+	
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
+}
+
+// Deletes old value of the key and inserts new one
+func deleteAndInsert(key string, value string, db *sql.DB) {
+	if DeleteKey(key, db) {
+		if InsertKey(key, value, db) {
+			log.Printf(key, " is stored to db.")
+		}
+	}
+}
+
+func PrintStartMsg(port string){
+	name := `
+	___                        _  ____   __
+	| _ \___ __ _____ _____ _ _| |/ /\ \ / /
+	|   / -_) _/ _ \ V / -_) '_| ' <  \ V / 
+	|_|_\___\__\___/\_/\___|_| |_|\_\  \_/ `	
+	
+				fmt.Println(string("\033[36m"),name)
+				fmt.Println()
+				fmt.Println("Server started successfully on port"+port)	
 }
 
 func main() {
@@ -76,10 +100,19 @@ func main() {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
 	s := grpc.NewServer()
-	pb.RegisterRecoverKVServer(s, &server{})
-	fmt.Println("Server started successfully on port"+port)
-
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve: %v\n", err)
+	// start db test.db
+	var ret bool
+	db, ret = InitDB("test.db")
+	if ret {
+		// load the stored data to table
+		if table.LoadKV("test.db", db) {
+			pb.RegisterRecoverKVServer(s, &server{})
+			PrintStartMsg(port)
+			if err := s.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve: %v\n", err)
+			}
+		}
+	} else {
+		log.Fatalf("Server failed to start == DB not initialized.")
 	}
 }

@@ -1,15 +1,14 @@
-package persist
+package main
 
 import (
     "database/sql"
-    "fmt"
 	"log"
 	"os"
 
     _ "github.com/mattn/go-sqlite3"
 )
 
-type MyMap map[string]string
+//type MyMap map[string]string
 
 func init(){
 	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -20,7 +19,7 @@ func init(){
 }
 
 //"./recover.db"
-func CreateTable(dbPath string) (*sql.DB, bool){
+func InitDB(dbPath string) (*sql.DB, bool){
 	database, err := sql.Open("sqlite3", dbPath)
 	if checkErr(err){
 		log.Println("=== FAILED TO OPEN DB:", err.Error())
@@ -32,6 +31,7 @@ func CreateTable(dbPath string) (*sql.DB, bool){
 		log.Println("=== TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
+	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
 	return database, true
 }
 
@@ -67,7 +67,7 @@ func DeleteKey(key string, database *sql.DB) bool {
 	return true
 }
 
-func (table *MyMap) loadKV(dbPath string, database *sql.DB) bool{
+func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool{
 	rows, err := 
 		database.Query("SELECT key, value FROM store")
 	if checkErr(err) {
@@ -93,15 +93,23 @@ func checkErr(err error) bool{
 	return false
 }
 
-func main() {
-	db, stat := CreateTable("test.db") 
-	
-	if stat {
-		if InsertKey("hello", "world", db) {
-			if val, bo := GetValue("hello", db); bo {
-				fmt.Println(val)
-			}
-		}
-	}
-
-}
+// test code
+// func main() {
+// 	db, stat := CreateTable("test.db")
+// 	var table = make(MyMap)
+// 	if stat {
+// 			if InsertKey("hello", "world", db) {
+// 					if val, bo := GetValue("hello", db); bo {
+// 							fmt.Println(val)
+// 					}
+// 			}
+// 	}
+// 	InsertKey("hallo", "abc", db)
+// 	InsertKey("allo", "abc", db)
+// 	InsertKey("llo", "abc", db)
+// 	nVal, err := GetValue("hello", db)
+// 	fmt.Println(nVal,err)
+// 	DeleteKey("hello",db);
+// 	table.loadKV("test.db",db)
+// 	fmt.Println(table)
+// }
