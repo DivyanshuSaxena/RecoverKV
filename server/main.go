@@ -68,6 +68,7 @@ func main() {
 		log.Fatal(err)
 	}
 	log.SetOutput(file)
+	defer file.Close()
 
 	// Start the server and listen for requests
 	lis, err := net.Listen("tcp", "localhost"+port)
