@@ -25,6 +25,15 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		log.Println("=== FAILED TO OPEN DB:", err.Error())
 		return nil, false
 	}
+
+	_, err = database.Exec(`
+		PRAGMA synchronous = NORMAL;
+		PRAGMA journal_mode = WAL;`);
+	if err != nil {
+		log.Println("=== PARGMA UPDATE FAILED:")
+		return nil, false
+	}
+
 	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS store (key TEXT PRIMARY KEY, value TEXT)")
 	defer statement.Close()
 
@@ -34,18 +43,25 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		return nil, false
 	}
 
+	updateStatement, err = database.Prepare("REPLACE INTO store (key, value) VALUES (?, ?)")
+	if checkErr(err) {
+		log.Println("=== UPDATE QUERY PREPATION FAILED:", err.Error())
+		return nil, false
+	}
+
 	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
 	return database, true
 }
 
 // UpdateKey updates the `value` for `key` in DB
 func UpdateKey(key string, value string, database *sql.DB) bool {
-	statement, _ := database.Prepare("REPLACE INTO store (key, value) VALUES (?, ?)")
-	defer statement.Close()
+	
+	m.Lock()
+	_, err := updateStatement.Exec(key, value)
+	m.Unlock()
 
-	_, err := statement.Exec(key, value)
 	if checkErr(err) {
-		log.Println("=== KEY INSERTION FAILED:", err.Error())
+		log.Println("=== KEY UPDATE FAILED:", err.Error())
 	}
 
 	return true
@@ -55,7 +71,7 @@ func UpdateKey(key string, value string, database *sql.DB) bool {
 func GetValue(key string, database *sql.DB) (string, bool) {
 	rows, err := database.Query("SELECT value FROM store WHERE key=?", key)
 	if checkErr(err) {
-		log.Println("=== KEY DELETION FAILED:", err.Error())
+		log.Println("=== KEY FETCH FAILED:", err.Error())
 		return "", false
 	}
 	defer rows.Close()

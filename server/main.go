@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 	pb "recoverKV/gen/recoverKV"
 
 	"google.golang.org/grpc"
@@ -21,6 +22,9 @@ type BigMAP map[string]string
 
 var table = make(BigMAP)
 var db *sql.DB
+var updateStatement *sql.Stmt
+
+var m sync.Mutex
 
 // server is used to implement RecoverKV service.
 type server struct {
@@ -60,8 +64,7 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 		successCode = 1
 	}
 
-	// TODO: Make it work with async (tests failing)
-	UpdateKey(key, newVal, db)
+	go UpdateKey(key, newVal, db)
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
 

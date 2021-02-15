@@ -11,7 +11,7 @@ using namespace std;
 #define KEY_SIZE 50
 #define VALUE_SIZE 100
 
-#define SLEEP_INTERVAL 30
+#define SLEEP_INTERVAL 10
 
 // SINGLE WRITE CYCLE FOLLOWED BY READS
 int test_correctness_single_write_and_read(KV739Client *client,
@@ -190,7 +190,7 @@ int test_correctness_durability(KV739Client *client, int total_requests) {
   for (int i = 0; i < total_requests; i++) {
     if (strcmp(newValues[i], oldValues[i]) != 0) {
       cout << "TEST 4 FAILED: Case " << i << " Expected " << newValues[i]
-           << ", Got " << oldValues[i] << endl;
+           << ", Got " << oldValues[i] << "for key " << keys[i] << endl;
       return 0;
     }
   }

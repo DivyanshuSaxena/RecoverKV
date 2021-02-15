@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
   }
 
   // generate key-value pairs
-  generate_keys(100);
+  generate_keys(10000);
 
   tests_passed += test_performance_simple_writes(client);
   cout << "-----------------------------------------" << endl;
@@ -192,7 +192,7 @@ int main(int argc, char *argv[]) {
   tests_passed += test_performance_simple_reads(client);
   cout << "-----------------------------------------" << endl;
 
-  tests_passed += test_performance_exponential_reads(client, 1000);
+  tests_passed += test_performance_exponential_reads(client, 10000);
   cout << "-----------------------------------------" << endl;
 
   // free state and disconnect from server
