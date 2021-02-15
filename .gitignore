@@ -45,6 +45,11 @@
 # Executables
 server/recoverKV
 client/*test
+client/lib739kv.so
+
+# Generated proto files
+server/gen/
+*.pb.cc
 
 # Ignore Log files
 *.log
