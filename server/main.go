@@ -2,22 +2,26 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"google.golang.org/grpc"
-	"database/sql"
 	pb "recoverKV/gen/recoverKV"
+
+	"google.golang.org/grpc"
 )
 
 const (
 	port = ":50051"
 )
 
+// BigMAP is the type for the (key-value) pairs table
 type BigMAP map[string]string
+
 var table = make(BigMAP)
 var db *sql.DB
+
 // server is used to implement RecoverKV service.
 type server struct {
 	pb.UnimplementedRecoverKVServer
@@ -50,7 +54,7 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 	var successCode int32 = 0
 	val, prs := table[key]
 	table[key] = newVal
-	
+
 	if !prs {
 		val = newVal
 		successCode = 1
@@ -61,16 +65,17 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
 
-func PrintStartMsg(port string){
+// PrintStartMsg prints the start message for the server
+func PrintStartMsg(port string) {
 	name := `
 	___                        _  ____   __
 	| _ \___ __ _____ _____ _ _| |/ /\ \ / /
 	|   / -_) _/ _ \ V / -_) '_| ' <  \ V / 
-	|_|_\___\__\___/\_/\___|_| |_|\_\  \_/ `	
-	
-				fmt.Println(string("\033[36m"),name)
-				fmt.Println()
-				fmt.Println("Server started successfully on port"+port)	
+	|_|_\___\__\___/\_/\___|_| |_|\_\  \_/ `
+
+	fmt.Println(string("\033[36m"), name)
+	fmt.Println()
+	fmt.Println("Server started successfully on port" + port)
 }
 
 func main() {
@@ -99,7 +104,7 @@ func main() {
 			pb.RegisterRecoverKVServer(s, &server{})
 			PrintStartMsg(port)
 			if err := s.Serve(lis); err != nil {
-			log.Fatalf("Failed to serve: %v\n", err)
+				log.Fatalf("Failed to serve: %v\n", err)
 			}
 		}
 	} else {

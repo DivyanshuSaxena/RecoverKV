@@ -10,7 +10,7 @@ import (
 
 //type MyMap map[string]string
 
-func init(){
+func init() {
 	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)
@@ -18,10 +18,10 @@ func init(){
 	log.SetOutput(file)
 }
 
-//"./recover.db"
-func InitDB(dbPath string) (*sql.DB, bool){
+// InitDB initializes DB at the dbPath"./recover.db"
+func InitDB(dbPath string) (*sql.DB, bool) {
 	database, err := sql.Open("sqlite3", dbPath)
-	if checkErr(err){
+	if checkErr(err) {
 		log.Println("=== FAILED TO OPEN DB:", err.Error())
 		return nil, false
 	}
@@ -38,7 +38,8 @@ func InitDB(dbPath string) (*sql.DB, bool){
 	return database, true
 }
 
-func UpdateKey(key string, value string, database *sql.DB) bool{
+// UpdateKey updates the `value` for `key` in DB
+func UpdateKey(key string, value string, database *sql.DB) bool {
 	statement, _ := database.Prepare("REPLACE INTO store (key, value) VALUES (?, ?)")
 	defer statement.Close()
 
@@ -50,7 +51,8 @@ func UpdateKey(key string, value string, database *sql.DB) bool{
 	return true
 }
 
-func GetValue(key string, database *sql.DB) (string, bool){
+// GetValue returns value for `key` in the DB
+func GetValue(key string, database *sql.DB) (string, bool) {
 	rows, err := database.Query("SELECT value FROM store WHERE key=?", key)
 	if checkErr(err) {
 		log.Println("=== KEY DELETION FAILED:", err.Error())
@@ -66,8 +68,9 @@ func GetValue(key string, database *sql.DB) (string, bool){
 	return value, true
 }
 
-func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool{
-	rows, err := 
+// LoadKV reads back db from the file when service restarts
+func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool {
+	rows, err :=
 		database.Query("SELECT key, value FROM store")
 	if checkErr(err) {
 		log.Println("=== DB LOAD FAILED:", err.Error())
@@ -86,7 +89,7 @@ func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool{
 }
 
 // If additional error handling is required.
-func checkErr(err error) bool{
+func checkErr(err error) bool {
 	if err != nil {
 		return true
 		//panic(err)
