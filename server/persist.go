@@ -1,11 +1,11 @@
 package main
 
 import (
-    "database/sql"
+	"database/sql"
 	"log"
 	"os"
 
-    _ "github.com/mattn/go-sqlite3"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 //type MyMap map[string]string
@@ -26,21 +26,27 @@ func InitDB(dbPath string) (*sql.DB, bool){
 		return nil, false
 	}
 	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS store (key TEXT PRIMARY KEY, value TEXT)")
-    _, err = statement.Exec()
+	defer statement.Close()
+
+	_, err = statement.Exec()
 	if checkErr(err) {
 		log.Println("=== TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
+
 	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
 	return database, true
 }
 
-func InsertKey(key string, value string, database *sql.DB) bool{
-	statement, _ := database.Prepare("INSERT INTO store (key, value) VALUES (?, ?)")
-    _, err := statement.Exec(key, value)
+func UpdateKey(key string, value string, database *sql.DB) bool{
+	statement, _ := database.Prepare("REPLACE INTO store (key, value) VALUES (?, ?)")
+	defer statement.Close()
+
+	_, err := statement.Exec(key, value)
 	if checkErr(err) {
 		log.Println("=== KEY INSERTION FAILED:", err.Error())
 	}
+
 	return true
 }
 
@@ -50,21 +56,14 @@ func GetValue(key string, database *sql.DB) (string, bool){
 		log.Println("=== KEY DELETION FAILED:", err.Error())
 		return "", false
 	}
+	defer rows.Close()
+
 	var value string
 	for rows.Next() {
 		rows.Scan(&value)
 	}
-	return value, true
-}
 
-func DeleteKey(key string, database *sql.DB) bool {
-	statement, _ := database.Prepare("DELETE FROM store WHERE key=?")
-	_, err := statement.Exec(key)
-	if checkErr(err) {
-		log.Println("=== KEY DELETION FAILED:", err.Error())
-		return false
-	}
-	return true
+	return value, true
 }
 
 func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool{
@@ -74,13 +73,15 @@ func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool{
 		log.Println("=== DB LOAD FAILED:", err.Error())
 		return false
 	}
-    var key string
-    var value string
-    for rows.Next() {
-        rows.Scan(&key, &value)
-        (*table)[key] = value
-		//fmt.Println(key + " : " + value)
-    }
+	defer rows.Close()
+
+	var key string
+	var value string
+	for rows.Next() {
+		rows.Scan(&key, &value)
+		(*table)[key] = value
+	}
+
 	return true
 }
 
@@ -92,24 +93,3 @@ func checkErr(err error) bool{
 	}
 	return false
 }
-
-// test code
-// func main() {
-// 	db, stat := CreateTable("test.db")
-// 	var table = make(MyMap)
-// 	if stat {
-// 			if InsertKey("hello", "world", db) {
-// 					if val, bo := GetValue("hello", db); bo {
-// 							fmt.Println(val)
-// 					}
-// 			}
-// 	}
-// 	InsertKey("hallo", "abc", db)
-// 	InsertKey("allo", "abc", db)
-// 	InsertKey("llo", "abc", db)
-// 	nVal, err := GetValue("hello", db)
-// 	fmt.Println(nVal,err)
-// 	DeleteKey("hello",db);
-// 	table.loadKV("test.db",db)
-// 	fmt.Println(table)
-// }

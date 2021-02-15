@@ -48,3 +48,6 @@ client/*test
 
 # Ignore Log files
 *.log
+
+# Ignore db
+*.db

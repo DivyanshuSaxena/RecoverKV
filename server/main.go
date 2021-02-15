@@ -54,21 +54,11 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 	if !prs {
 		val = newVal
 		successCode = 1
-		go InsertKey(key, newVal, db)
-	} else {
-		go deleteAndInsert(key, newVal, db)
 	}
-	
-	return &pb.Response{Value: val, SuccessCode: successCode}, nil
-}
 
-// Deletes old value of the key and inserts new one
-func deleteAndInsert(key string, value string, db *sql.DB) {
-	if DeleteKey(key, db) {
-		if InsertKey(key, value, db) {
-			log.Printf(key, " is stored to db.")
-		}
-	}
+	// TODO: Make it work with async (tests failing)
+	UpdateKey(key, newVal, db)
+	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
 
 func PrintStartMsg(port string){
@@ -102,10 +92,10 @@ func main() {
 	s := grpc.NewServer()
 	// start db test.db
 	var ret bool
-	db, ret = InitDB("test.db")
+	db, ret = InitDB("/tmp/test.db")
 	if ret {
 		// load the stored data to table
-		if table.LoadKV("test.db", db) {
+		if table.LoadKV("/tmp/test.db", db) {
 			pb.RegisterRecoverKVServer(s, &server{})
 			PrintStartMsg(port)
 			if err := s.Serve(lis); err != nil {
