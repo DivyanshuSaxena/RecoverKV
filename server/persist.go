@@ -55,10 +55,8 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 
 // UpdateKey updates the `value` for `key` in DB
 func UpdateKey(key string, value string, database *sql.DB) bool {
-	
-	m.Lock()
+
 	_, err := updateStatement.Exec(key, value)
-	m.Unlock()
 
 	if checkErr(err) {
 		log.Println("=== KEY UPDATE FAILED:", err.Error())

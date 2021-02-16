@@ -24,8 +24,6 @@ var table = make(BigMAP)
 var db *sql.DB
 var updateStatement *sql.Stmt
 
-var m sync.Mutex
-
 // server is used to implement RecoverKV service.
 type server struct {
 	pb.UnimplementedRecoverKVServer
@@ -64,7 +62,7 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 		successCode = 1
 	}
 
-	go UpdateKey(key, newVal, db)
+	UpdateKey(key, newVal, db)
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
 
