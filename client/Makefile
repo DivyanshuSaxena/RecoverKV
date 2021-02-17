@@ -48,4 +48,4 @@ correctness_test: tests/correctness_test.cc
 	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
 
 clean:
-	rm -f *.o *.pb.cc *_test
+	rm -f *.o *.pb.cc *_test *.log

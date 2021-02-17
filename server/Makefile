@@ -15,4 +15,4 @@ build:
 
 clean:
 	rm -r gen
-	rm recoverKV
+	rm recoverKV *.log
