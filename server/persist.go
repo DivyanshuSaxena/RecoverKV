@@ -28,7 +28,7 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 
 	_, err = database.Exec(`
 		PRAGMA synchronous = NORMAL;
-		PRAGMA journal_mode = WAL;`);
+		PRAGMA journal_mode = WAL;`)
 	if err != nil {
 		log.Println("=== PARGMA UPDATE FAILED:")
 		return nil, false
