@@ -1,6 +1,7 @@
 LDFLAGS += -L/usr/local/lib `pkg-config --libs protobuf grpc++ grpc`\
            -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed\
            -ldl
+THFLAGS = -pthread
 
 CXX = g++
 CXXFLAGS += `pkg-config --cflags protobuf grpc`
@@ -35,10 +36,13 @@ client.o: client.cc
 %.pb.cc: %.proto
 	protoc -I $(PROTOS_PATH) --cpp_out=. $<
 
-test: performance_test correctness_test
+test: performance_test correctness_test multiperf_test
 
 performance_test: tests/performance_test.cc
 	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
+
+multiperf_test: tests/multiperf_test.cc
+	$(CXX) $(CXXFLAGS) $< -L. $(THFLAGS) -l739kv -Wl,-rpath=. -o $@
 
 correctness_test: tests/correctness_test.cc
 	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@

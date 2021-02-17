@@ -7,8 +7,8 @@ import (
 	"log"
 	"net"
 	"os"
-	"sync"
 	pb "recoverKV/gen/recoverKV"
+	"sync"
 
 	"google.golang.org/grpc"
 )
@@ -20,7 +20,10 @@ const (
 // BigMAP is the type for the (key-value) pairs table
 type BigMAP map[string]string
 
-var table = make(BigMAP)
+var (
+	table   = make(BigMAP)
+	tableMu = sync.Mutex{}
+)
 var db *sql.DB
 var updateStatement *sql.Stmt
 
@@ -35,9 +38,12 @@ type server struct {
 func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	log.Printf("GetValue Received: %v\n", key)
-
 	var successCode int32 = 0
+
+	tableMu.Lock()
 	val, prs := table[key]
+	tableMu.Unlock()
+
 	if !prs {
 		successCode = 1
 	}
@@ -52,10 +58,15 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 	key := in.GetKey()
 	newVal := in.GetValue()
 	log.Printf("SetValue Received: %v:%v\n", key, newVal)
-
 	var successCode int32 = 0
+
+	tableMu.Lock()
 	val, prs := table[key]
 	table[key] = newVal
+	tableMu.Unlock()
+
+	// tableMutex.RLock()
+	// tableMutex.RUnlock()
 
 	if !prs {
 		val = newVal
