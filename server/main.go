@@ -37,7 +37,7 @@ type server struct {
 // 				 ("", 1) if the key is absent
 func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
-	log.Printf("GetValue Received: %v\n", key)
+	//log.Printf("GetValue Received: %v\n", key)
 	var successCode int32 = 0
 
 	tableMu.Lock()
@@ -57,16 +57,13 @@ func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	newVal := in.GetValue()
-	log.Printf("SetValue Received: %v:%v\n", key, newVal)
+	//log.Printf("SetValue Received: %v:%v\n", key, newVal)
 	var successCode int32 = 0
 
 	tableMu.Lock()
 	val, prs := table[key]
 	table[key] = newVal
 	tableMu.Unlock()
-
-	// tableMutex.RLock()
-	// tableMutex.RUnlock()
 
 	if !prs {
 		val = newVal

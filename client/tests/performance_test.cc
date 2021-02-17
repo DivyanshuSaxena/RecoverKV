@@ -16,7 +16,7 @@ using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;
 using exp_dist = std::exponential_distribution<double>;
 
-#define TOTAL_TESTS 3
+#define TOTAL_TESTS 4
 #define KEY_SIZE 128
 #define VALUE_SIZE 2048
 
