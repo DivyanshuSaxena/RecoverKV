@@ -11,7 +11,6 @@ import (
 	"sync"
 
 	"google.golang.org/grpc"
-	"github.com/pkg/profile"
 )
 
 const (
@@ -90,7 +89,7 @@ func PrintStartMsg(port string) {
 
 func main() {
 	fmt.Println("Starting server execution")
-	defer profile.Start().Stop()
+
 	// If the file doesn't exist, create it or append to the file
 	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
