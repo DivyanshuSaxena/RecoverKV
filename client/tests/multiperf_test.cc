@@ -46,7 +46,7 @@ void generate_keys(int total_keys) {
 }
 
 // PARSE TIME ARRAYS AND DISPLAY STATISTICS
-void latency_results(vector<double> &time, std::string name) {
+void latency_results(vector<double> &time, std::string name, double run_time) {
   cout << "Results for test: " << name << endl;
 
   ofstream out_file(name + ".log");
@@ -57,7 +57,7 @@ void latency_results(vector<double> &time, std::string name) {
   // Calculate average latency and total throughput
   double total_time = accumulate(time.begin(), time.end(), 0.0);
   double average = total_time / time.size();
-  double throughput = 1000 / average;
+  double throughput = time.size() * 1000 / run_time;
 
   // Display statistics
   cout << "Average Latency: " << average << "ms" << endl;
@@ -147,6 +147,11 @@ int main(int argc, char *argv[]) {
   vector<double> read_times(keys.size());
   vector<thread> t_vec;
 
+  high_resolution_clock::time_point start;
+  high_resolution_clock::time_point end;
+  duration<double, std::milli> duration_writes, duration_reads;
+
+  start = high_resolution_clock::now();
   for (int t = 0; t < pool_size; t++) {
     thread t_obj(test_performance_async_writes, clients.at(t).get(),
                  std::ref(write_times), t, pool_size);
@@ -156,8 +161,12 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < t_vec.size(); i++) {
     t_vec.at(i).join();
   }
+  end = high_resolution_clock::now();
+  duration_writes = duration_cast<duration<double, std::milli>>(end - start);
+
   t_vec.clear();
 
+  start = high_resolution_clock::now();
   for (int t = 0; t < pool_size; t++) {
     thread t_obj(test_performance_async_reads, clients.at(t).get(),
                  std::ref(read_times), t, pool_size);
@@ -167,9 +176,11 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < t_vec.size(); i++) {
     t_vec.at(i).join();
   }
+  end = high_resolution_clock::now();
+  duration_reads = duration_cast<duration<double, std::milli>>(end - start);
 
-  latency_results(write_times, "multi_writes");
-  latency_results(read_times, "multi_reads");
+  latency_results(write_times, "multi_writes", duration_writes.count());
+  latency_results(read_times, "multi_reads", duration_reads.count());
 
   // free state and disconnect all clients from server
   for (auto client_ptr : clients) {
