@@ -3,6 +3,7 @@ all: init protoc build
 gen: protoc build
 
 init:
+	rm -rf go.mod
 	go mod init recoverKV
 
 protoc:
