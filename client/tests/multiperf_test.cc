@@ -37,7 +37,7 @@ void generate_keys(int total_keys) {
   for (int i = 0; i < total_keys; i++) {
     char *key = new char[KEY_SIZE];
     char *value = new char[VALUE_SIZE];
-    sprintf(key, "%d-%d-%d", processID, i % total_keys, rand());
+    sprintf(key, "%d-%d", processID, i % total_keys);
     sprintf(value, "%x-%0.2f-%d", processID, (double)i / total_keys, 1);
 
     keys.push_back(key);
