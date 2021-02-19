@@ -70,6 +70,12 @@ int KV739Client::kv739_init(char *server_name) {
     return -1;
   }
 
+  if (client != NULL) {
+    cout << "[ERROR]"
+         << "Cannot init again" << endl;
+    return -1;
+  }
+
   try {
     client = new RecoverKVClient(
         grpc::CreateChannel(server_name, grpc::InsecureChannelCredentials()));
