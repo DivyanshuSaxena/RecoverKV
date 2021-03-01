@@ -27,8 +27,9 @@ service RecoverKV {
 
 // The request message containing key
 message Request {
-    string key = 1;
-    string value = 2;
+	string objectID = 1;
+    string key = 2;
+    string value = 3;
 }
 
 // The response message from servers
@@ -39,20 +40,20 @@ message Response {
 
 // For setting state at the load balancer
 message StateRequest {
-	uint64 objectID = 1;
+	string objectID = 1;
 	string serversList = 2;
 }
 
 // For stoping a server instance
 message KillRequest {
-	uint64 objectID = 1;
+	string objectID = 1;
 	string serverName = 2;
 	int32 cleanType = 3;
 }
 
 // For partitioning network of a server instance
 message PartitionRequest {
-	uint64 objectID = 1;
+	string objectID = 1;
 	string serverName = 2;
 	string reachable = 3;
 }

@@ -1,7 +1,7 @@
 #include <string>
 #include <iostream>
 #include <exception>
-#include <unordered_map>
+#include <uuid/uuid.h>
 
 #include <grpcpp/grpcpp.h>
 #include "recoverKV.grpc.pb.h"
@@ -20,44 +20,47 @@ using recoverKV::PartitionRequest;
 using namespace std;
 
 // Stub class for overriding proto
-class RecoverKVClient {
-	public:
+class RecoverKVClient
+{
+public:
 
-		RecoverKVClient(std::shared_ptr<Channel> channel) : stub_(RecoverKV::NewStub(channel)) {}
+    RecoverKVClient(std::shared_ptr<Channel> channel) : stub_(RecoverKV::NewStub(channel)) {}
 
-		int getValue(size_t object_id, char *key, char *value);
-		int setValue(size_t object_id, char *key, char *value, char *old_value);
+    int getValue(char *client_id, char *key, char *value);
+    int setValue(char *client_id, char *key, char *value, char *old_value);
 
-		int initLBState(size_t object_id, string servers_list);
-		int freeLBState(size_t object_id);
+    int initLBState(char *client_id, string servers_list);
+    int freeLBState(char *client_id);
 
-		int stopServer(size_t object_id, char* server_name, int clean);
-		int partitionServer(size_t object_id, char* server_name, string reachable_list);
+    int stopServer(char *client_id, char *server_name, int clean);
+    int partitionServer(char *client_id, char *server_name, string reachable_list);
 
-	private:
-		std::unique_ptr<RecoverKV::Stub> stub_;
+private:
+    std::unique_ptr<RecoverKV::Stub> stub_;
 };
 
 // Client callable methods
-class KV739Client {
-	public:
+class KV739Client
+{
+public:
 
-		KV739Client();
+    KV739Client();
 
-		~KV739Client();
+    ~KV739Client();
 
-		int kv739_init(char **server_names);
-		int kv739_shutdown(void);
-		int kv739_get(char *key, char *value);
-		int kv739_put(char *key, char *value, char *old_value);
+    int kv739_init(char **server_names);
+    int kv739_shutdown(void);
+    int kv739_get(char *key, char *value);
+    int kv739_put(char *key, char *value, char *old_value);
 
-		int kv739_die(char *server_name, int clean);
-		int kv739_partition(char *server_name, char **reachable);
+    int kv739_die(char *server_name, int clean);
+    int kv739_partition(char *server_name, char **reachable);
 
-	private:
+private:
 
-		size_t object_id;
-		string lb_addr;
+    char *client_id;
+    string lb_addr;
 
-		RecoverKVClient *client;
+    uuid_t id;
+    RecoverKVClient *client;
 };

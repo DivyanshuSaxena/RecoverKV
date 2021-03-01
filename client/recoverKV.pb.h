@@ -193,10 +193,27 @@ class Request PROTOBUF_FINAL :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kKeyFieldNumber = 1,
-    kValueFieldNumber = 2,
+    kObjectIDFieldNumber = 1,
+    kKeyFieldNumber = 2,
+    kValueFieldNumber = 3,
   };
-  // string key = 1;
+  // string objectID = 1;
+  void clear_objectid();
+  const std::string& objectid() const;
+  void set_objectid(const std::string& value);
+  void set_objectid(std::string&& value);
+  void set_objectid(const char* value);
+  void set_objectid(const char* value, size_t size);
+  std::string* mutable_objectid();
+  std::string* release_objectid();
+  void set_allocated_objectid(std::string* objectid);
+  private:
+  const std::string& _internal_objectid() const;
+  void _internal_set_objectid(const std::string& value);
+  std::string* _internal_mutable_objectid();
+  public:
+
+  // string key = 2;
   void clear_key();
   const std::string& key() const;
   void set_key(const std::string& value);
@@ -212,7 +229,7 @@ class Request PROTOBUF_FINAL :
   std::string* _internal_mutable_key();
   public:
 
-  // string value = 2;
+  // string value = 3;
   void clear_value();
   const std::string& value() const;
   void set_value(const std::string& value);
@@ -235,6 +252,7 @@ class Request PROTOBUF_FINAL :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr objectid_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr key_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr value_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
@@ -508,9 +526,25 @@ class StateRequest PROTOBUF_FINAL :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kServersListFieldNumber = 2,
     kObjectIDFieldNumber = 1,
+    kServersListFieldNumber = 2,
   };
+  // string objectID = 1;
+  void clear_objectid();
+  const std::string& objectid() const;
+  void set_objectid(const std::string& value);
+  void set_objectid(std::string&& value);
+  void set_objectid(const char* value);
+  void set_objectid(const char* value, size_t size);
+  std::string* mutable_objectid();
+  std::string* release_objectid();
+  void set_allocated_objectid(std::string* objectid);
+  private:
+  const std::string& _internal_objectid() const;
+  void _internal_set_objectid(const std::string& value);
+  std::string* _internal_mutable_objectid();
+  public:
+
   // string serversList = 2;
   void clear_serverslist();
   const std::string& serverslist() const;
@@ -527,15 +561,6 @@ class StateRequest PROTOBUF_FINAL :
   std::string* _internal_mutable_serverslist();
   public:
 
-  // uint64 objectID = 1;
-  void clear_objectid();
-  ::PROTOBUF_NAMESPACE_ID::uint64 objectid() const;
-  void set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_objectid() const;
-  void _internal_set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value);
-  public:
-
   // @@protoc_insertion_point(class_scope:recoverKV.StateRequest)
  private:
   class _Internal;
@@ -543,8 +568,8 @@ class StateRequest PROTOBUF_FINAL :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr objectid_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr serverslist_;
-  ::PROTOBUF_NAMESPACE_ID::uint64 objectid_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_recoverKV_2eproto;
 };
@@ -662,10 +687,26 @@ class KillRequest PROTOBUF_FINAL :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kServerNameFieldNumber = 2,
     kObjectIDFieldNumber = 1,
+    kServerNameFieldNumber = 2,
     kCleanTypeFieldNumber = 3,
   };
+  // string objectID = 1;
+  void clear_objectid();
+  const std::string& objectid() const;
+  void set_objectid(const std::string& value);
+  void set_objectid(std::string&& value);
+  void set_objectid(const char* value);
+  void set_objectid(const char* value, size_t size);
+  std::string* mutable_objectid();
+  std::string* release_objectid();
+  void set_allocated_objectid(std::string* objectid);
+  private:
+  const std::string& _internal_objectid() const;
+  void _internal_set_objectid(const std::string& value);
+  std::string* _internal_mutable_objectid();
+  public:
+
   // string serverName = 2;
   void clear_servername();
   const std::string& servername() const;
@@ -680,15 +721,6 @@ class KillRequest PROTOBUF_FINAL :
   const std::string& _internal_servername() const;
   void _internal_set_servername(const std::string& value);
   std::string* _internal_mutable_servername();
-  public:
-
-  // uint64 objectID = 1;
-  void clear_objectid();
-  ::PROTOBUF_NAMESPACE_ID::uint64 objectid() const;
-  void set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_objectid() const;
-  void _internal_set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value);
   public:
 
   // int32 cleanType = 3;
@@ -707,8 +739,8 @@ class KillRequest PROTOBUF_FINAL :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr objectid_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr servername_;
-  ::PROTOBUF_NAMESPACE_ID::uint64 objectid_;
   ::PROTOBUF_NAMESPACE_ID::int32 cleantype_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_recoverKV_2eproto;
@@ -827,10 +859,26 @@ class PartitionRequest PROTOBUF_FINAL :
   // accessors -------------------------------------------------------
 
   enum : int {
+    kObjectIDFieldNumber = 1,
     kServerNameFieldNumber = 2,
     kReachableFieldNumber = 3,
-    kObjectIDFieldNumber = 1,
   };
+  // string objectID = 1;
+  void clear_objectid();
+  const std::string& objectid() const;
+  void set_objectid(const std::string& value);
+  void set_objectid(std::string&& value);
+  void set_objectid(const char* value);
+  void set_objectid(const char* value, size_t size);
+  std::string* mutable_objectid();
+  std::string* release_objectid();
+  void set_allocated_objectid(std::string* objectid);
+  private:
+  const std::string& _internal_objectid() const;
+  void _internal_set_objectid(const std::string& value);
+  std::string* _internal_mutable_objectid();
+  public:
+
   // string serverName = 2;
   void clear_servername();
   const std::string& servername() const;
@@ -863,15 +911,6 @@ class PartitionRequest PROTOBUF_FINAL :
   std::string* _internal_mutable_reachable();
   public:
 
-  // uint64 objectID = 1;
-  void clear_objectid();
-  ::PROTOBUF_NAMESPACE_ID::uint64 objectid() const;
-  void set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::uint64 _internal_objectid() const;
-  void _internal_set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value);
-  public:
-
   // @@protoc_insertion_point(class_scope:recoverKV.PartitionRequest)
  private:
   class _Internal;
@@ -879,9 +918,9 @@ class PartitionRequest PROTOBUF_FINAL :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr objectid_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr servername_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr reachable_;
-  ::PROTOBUF_NAMESPACE_ID::uint64 objectid_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_recoverKV_2eproto;
 };
@@ -896,7 +935,68 @@ class PartitionRequest PROTOBUF_FINAL :
 #endif  // __GNUC__
 // Request
 
-// string key = 1;
+// string objectID = 1;
+inline void Request::clear_objectid() {
+  objectid_.ClearToEmpty();
+}
+inline const std::string& Request::objectid() const {
+  // @@protoc_insertion_point(field_get:recoverKV.Request.objectID)
+  return _internal_objectid();
+}
+inline void Request::set_objectid(const std::string& value) {
+  _internal_set_objectid(value);
+  // @@protoc_insertion_point(field_set:recoverKV.Request.objectID)
+}
+inline std::string* Request::mutable_objectid() {
+  // @@protoc_insertion_point(field_mutable:recoverKV.Request.objectID)
+  return _internal_mutable_objectid();
+}
+inline const std::string& Request::_internal_objectid() const {
+  return objectid_.Get();
+}
+inline void Request::_internal_set_objectid(const std::string& value) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArena());
+}
+inline void Request::set_objectid(std::string&& value) {
+  
+  objectid_.Set(
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::move(value), GetArena());
+  // @@protoc_insertion_point(field_set_rvalue:recoverKV.Request.objectID)
+}
+inline void Request::set_objectid(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(value), GetArena());
+  // @@protoc_insertion_point(field_set_char:recoverKV.Request.objectID)
+}
+inline void Request::set_objectid(const char* value,
+    size_t size) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(
+      reinterpret_cast<const char*>(value), size), GetArena());
+  // @@protoc_insertion_point(field_set_pointer:recoverKV.Request.objectID)
+}
+inline std::string* Request::_internal_mutable_objectid() {
+  
+  return objectid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArena());
+}
+inline std::string* Request::release_objectid() {
+  // @@protoc_insertion_point(field_release:recoverKV.Request.objectID)
+  return objectid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArena());
+}
+inline void Request::set_allocated_objectid(std::string* objectid) {
+  if (objectid != nullptr) {
+    
+  } else {
+    
+  }
+  objectid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), objectid,
+      GetArena());
+  // @@protoc_insertion_point(field_set_allocated:recoverKV.Request.objectID)
+}
+
+// string key = 2;
 inline void Request::clear_key() {
   key_.ClearToEmpty();
 }
@@ -957,7 +1057,7 @@ inline void Request::set_allocated_key(std::string* key) {
   // @@protoc_insertion_point(field_set_allocated:recoverKV.Request.key)
 }
 
-// string value = 2;
+// string value = 3;
 inline void Request::clear_value() {
   value_.ClearToEmpty();
 }
@@ -1107,24 +1207,65 @@ inline void Response::set_successcode(::PROTOBUF_NAMESPACE_ID::int32 value) {
 
 // StateRequest
 
-// uint64 objectID = 1;
+// string objectID = 1;
 inline void StateRequest::clear_objectid() {
-  objectid_ = PROTOBUF_ULONGLONG(0);
+  objectid_.ClearToEmpty();
 }
-inline ::PROTOBUF_NAMESPACE_ID::uint64 StateRequest::_internal_objectid() const {
-  return objectid_;
-}
-inline ::PROTOBUF_NAMESPACE_ID::uint64 StateRequest::objectid() const {
+inline const std::string& StateRequest::objectid() const {
   // @@protoc_insertion_point(field_get:recoverKV.StateRequest.objectID)
   return _internal_objectid();
 }
-inline void StateRequest::_internal_set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value) {
-  
-  objectid_ = value;
-}
-inline void StateRequest::set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+inline void StateRequest::set_objectid(const std::string& value) {
   _internal_set_objectid(value);
   // @@protoc_insertion_point(field_set:recoverKV.StateRequest.objectID)
+}
+inline std::string* StateRequest::mutable_objectid() {
+  // @@protoc_insertion_point(field_mutable:recoverKV.StateRequest.objectID)
+  return _internal_mutable_objectid();
+}
+inline const std::string& StateRequest::_internal_objectid() const {
+  return objectid_.Get();
+}
+inline void StateRequest::_internal_set_objectid(const std::string& value) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArena());
+}
+inline void StateRequest::set_objectid(std::string&& value) {
+  
+  objectid_.Set(
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::move(value), GetArena());
+  // @@protoc_insertion_point(field_set_rvalue:recoverKV.StateRequest.objectID)
+}
+inline void StateRequest::set_objectid(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(value), GetArena());
+  // @@protoc_insertion_point(field_set_char:recoverKV.StateRequest.objectID)
+}
+inline void StateRequest::set_objectid(const char* value,
+    size_t size) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(
+      reinterpret_cast<const char*>(value), size), GetArena());
+  // @@protoc_insertion_point(field_set_pointer:recoverKV.StateRequest.objectID)
+}
+inline std::string* StateRequest::_internal_mutable_objectid() {
+  
+  return objectid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArena());
+}
+inline std::string* StateRequest::release_objectid() {
+  // @@protoc_insertion_point(field_release:recoverKV.StateRequest.objectID)
+  return objectid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArena());
+}
+inline void StateRequest::set_allocated_objectid(std::string* objectid) {
+  if (objectid != nullptr) {
+    
+  } else {
+    
+  }
+  objectid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), objectid,
+      GetArena());
+  // @@protoc_insertion_point(field_set_allocated:recoverKV.StateRequest.objectID)
 }
 
 // string serversList = 2;
@@ -1192,24 +1333,65 @@ inline void StateRequest::set_allocated_serverslist(std::string* serverslist) {
 
 // KillRequest
 
-// uint64 objectID = 1;
+// string objectID = 1;
 inline void KillRequest::clear_objectid() {
-  objectid_ = PROTOBUF_ULONGLONG(0);
+  objectid_.ClearToEmpty();
 }
-inline ::PROTOBUF_NAMESPACE_ID::uint64 KillRequest::_internal_objectid() const {
-  return objectid_;
-}
-inline ::PROTOBUF_NAMESPACE_ID::uint64 KillRequest::objectid() const {
+inline const std::string& KillRequest::objectid() const {
   // @@protoc_insertion_point(field_get:recoverKV.KillRequest.objectID)
   return _internal_objectid();
 }
-inline void KillRequest::_internal_set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value) {
-  
-  objectid_ = value;
-}
-inline void KillRequest::set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+inline void KillRequest::set_objectid(const std::string& value) {
   _internal_set_objectid(value);
   // @@protoc_insertion_point(field_set:recoverKV.KillRequest.objectID)
+}
+inline std::string* KillRequest::mutable_objectid() {
+  // @@protoc_insertion_point(field_mutable:recoverKV.KillRequest.objectID)
+  return _internal_mutable_objectid();
+}
+inline const std::string& KillRequest::_internal_objectid() const {
+  return objectid_.Get();
+}
+inline void KillRequest::_internal_set_objectid(const std::string& value) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArena());
+}
+inline void KillRequest::set_objectid(std::string&& value) {
+  
+  objectid_.Set(
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::move(value), GetArena());
+  // @@protoc_insertion_point(field_set_rvalue:recoverKV.KillRequest.objectID)
+}
+inline void KillRequest::set_objectid(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(value), GetArena());
+  // @@protoc_insertion_point(field_set_char:recoverKV.KillRequest.objectID)
+}
+inline void KillRequest::set_objectid(const char* value,
+    size_t size) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(
+      reinterpret_cast<const char*>(value), size), GetArena());
+  // @@protoc_insertion_point(field_set_pointer:recoverKV.KillRequest.objectID)
+}
+inline std::string* KillRequest::_internal_mutable_objectid() {
+  
+  return objectid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArena());
+}
+inline std::string* KillRequest::release_objectid() {
+  // @@protoc_insertion_point(field_release:recoverKV.KillRequest.objectID)
+  return objectid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArena());
+}
+inline void KillRequest::set_allocated_objectid(std::string* objectid) {
+  if (objectid != nullptr) {
+    
+  } else {
+    
+  }
+  objectid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), objectid,
+      GetArena());
+  // @@protoc_insertion_point(field_set_allocated:recoverKV.KillRequest.objectID)
 }
 
 // string serverName = 2;
@@ -1297,24 +1479,65 @@ inline void KillRequest::set_cleantype(::PROTOBUF_NAMESPACE_ID::int32 value) {
 
 // PartitionRequest
 
-// uint64 objectID = 1;
+// string objectID = 1;
 inline void PartitionRequest::clear_objectid() {
-  objectid_ = PROTOBUF_ULONGLONG(0);
+  objectid_.ClearToEmpty();
 }
-inline ::PROTOBUF_NAMESPACE_ID::uint64 PartitionRequest::_internal_objectid() const {
-  return objectid_;
-}
-inline ::PROTOBUF_NAMESPACE_ID::uint64 PartitionRequest::objectid() const {
+inline const std::string& PartitionRequest::objectid() const {
   // @@protoc_insertion_point(field_get:recoverKV.PartitionRequest.objectID)
   return _internal_objectid();
 }
-inline void PartitionRequest::_internal_set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value) {
-  
-  objectid_ = value;
-}
-inline void PartitionRequest::set_objectid(::PROTOBUF_NAMESPACE_ID::uint64 value) {
+inline void PartitionRequest::set_objectid(const std::string& value) {
   _internal_set_objectid(value);
   // @@protoc_insertion_point(field_set:recoverKV.PartitionRequest.objectID)
+}
+inline std::string* PartitionRequest::mutable_objectid() {
+  // @@protoc_insertion_point(field_mutable:recoverKV.PartitionRequest.objectID)
+  return _internal_mutable_objectid();
+}
+inline const std::string& PartitionRequest::_internal_objectid() const {
+  return objectid_.Get();
+}
+inline void PartitionRequest::_internal_set_objectid(const std::string& value) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArena());
+}
+inline void PartitionRequest::set_objectid(std::string&& value) {
+  
+  objectid_.Set(
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::move(value), GetArena());
+  // @@protoc_insertion_point(field_set_rvalue:recoverKV.PartitionRequest.objectID)
+}
+inline void PartitionRequest::set_objectid(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(value), GetArena());
+  // @@protoc_insertion_point(field_set_char:recoverKV.PartitionRequest.objectID)
+}
+inline void PartitionRequest::set_objectid(const char* value,
+    size_t size) {
+  
+  objectid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(
+      reinterpret_cast<const char*>(value), size), GetArena());
+  // @@protoc_insertion_point(field_set_pointer:recoverKV.PartitionRequest.objectID)
+}
+inline std::string* PartitionRequest::_internal_mutable_objectid() {
+  
+  return objectid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArena());
+}
+inline std::string* PartitionRequest::release_objectid() {
+  // @@protoc_insertion_point(field_release:recoverKV.PartitionRequest.objectID)
+  return objectid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArena());
+}
+inline void PartitionRequest::set_allocated_objectid(std::string* objectid) {
+  if (objectid != nullptr) {
+    
+  } else {
+    
+  }
+  objectid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), objectid,
+      GetArena());
+  // @@protoc_insertion_point(field_set_allocated:recoverKV.PartitionRequest.objectID)
 }
 
 // string serverName = 2;

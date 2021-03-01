@@ -44,6 +44,7 @@
 
 # Executables
 server/recoverKV
+server/recoverLB
 client/*test
 client/lib739kv.so
 
