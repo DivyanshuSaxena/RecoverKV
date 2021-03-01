@@ -45,13 +45,45 @@ class RecoverKV final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> PrepareAsyncgetValue(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(PrepareAsyncgetValueRaw(context, request, cq));
     }
-    // Function invoked for fetching value
+    // Function invoked for setting value
     virtual ::grpc::Status setValue(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::recoverKV::Response* response) = 0;
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> AsyncsetValue(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(AsyncsetValueRaw(context, request, cq));
     }
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> PrepareAsyncsetValue(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(PrepareAsyncsetValueRaw(context, request, cq));
+    }
+    // Function invoked for setting state
+    virtual ::grpc::Status initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::recoverKV::Response* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> AsyncinitLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(AsyncinitLBStateRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> PrepareAsyncinitLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(PrepareAsyncinitLBStateRaw(context, request, cq));
+    }
+    // Function invoked for cleaning state
+    virtual ::grpc::Status freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::recoverKV::Response* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> AsyncfreeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(AsyncfreeLBStateRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> PrepareAsyncfreeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(PrepareAsyncfreeLBStateRaw(context, request, cq));
+    }
+    // Function invoked for terminating server instance
+    virtual ::grpc::Status stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::recoverKV::Response* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> AsyncstopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(AsyncstopServerRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> PrepareAsyncstopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(PrepareAsyncstopServerRaw(context, request, cq));
+    }
+    // Function invoked for partitioning server instance
+    virtual ::grpc::Status partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::recoverKV::Response* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> AsyncpartitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(AsyncpartitionServerRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>> PrepareAsyncpartitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>>(PrepareAsyncpartitionServerRaw(context, request, cq));
     }
     class experimental_async_interface {
      public:
@@ -63,12 +95,40 @@ class RecoverKV final {
       #else
       virtual void getValue(::grpc::ClientContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
       #endif
-      // Function invoked for fetching value
+      // Function invoked for setting value
       virtual void setValue(::grpc::ClientContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) = 0;
       #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
       virtual void setValue(::grpc::ClientContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       #else
       virtual void setValue(::grpc::ClientContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
+      #endif
+      // Function invoked for setting state
+      virtual void initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) = 0;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      virtual void initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      #else
+      virtual void initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
+      #endif
+      // Function invoked for cleaning state
+      virtual void freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) = 0;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      virtual void freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      #else
+      virtual void freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
+      #endif
+      // Function invoked for terminating server instance
+      virtual void stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) = 0;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      virtual void stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      #else
+      virtual void stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
+      #endif
+      // Function invoked for partitioning server instance
+      virtual void partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) = 0;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      virtual void partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      #else
+      virtual void partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
       #endif
     };
     #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
@@ -83,6 +143,14 @@ class RecoverKV final {
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* PrepareAsyncgetValueRaw(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* AsyncsetValueRaw(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* PrepareAsyncsetValueRaw(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* AsyncinitLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* PrepareAsyncinitLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* AsyncfreeLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* PrepareAsyncfreeLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* AsyncstopServerRaw(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* PrepareAsyncstopServerRaw(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* AsyncpartitionServerRaw(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Response>* PrepareAsyncpartitionServerRaw(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) = 0;
   };
   class Stub final : public StubInterface {
    public:
@@ -101,6 +169,34 @@ class RecoverKV final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> PrepareAsyncsetValue(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(PrepareAsyncsetValueRaw(context, request, cq));
     }
+    ::grpc::Status initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::recoverKV::Response* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> AsyncinitLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(AsyncinitLBStateRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> PrepareAsyncinitLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(PrepareAsyncinitLBStateRaw(context, request, cq));
+    }
+    ::grpc::Status freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::recoverKV::Response* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> AsyncfreeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(AsyncfreeLBStateRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> PrepareAsyncfreeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(PrepareAsyncfreeLBStateRaw(context, request, cq));
+    }
+    ::grpc::Status stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::recoverKV::Response* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> AsyncstopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(AsyncstopServerRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> PrepareAsyncstopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(PrepareAsyncstopServerRaw(context, request, cq));
+    }
+    ::grpc::Status partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::recoverKV::Response* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> AsyncpartitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(AsyncpartitionServerRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>> PrepareAsyncpartitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>>(PrepareAsyncpartitionServerRaw(context, request, cq));
+    }
     class experimental_async final :
       public StubInterface::experimental_async_interface {
      public:
@@ -115,6 +211,30 @@ class RecoverKV final {
       void setValue(::grpc::ClientContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) override;
       #else
       void setValue(::grpc::ClientContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) override;
+      #endif
+      void initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) override;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      void initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) override;
+      #else
+      void initLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) override;
+      #endif
+      void freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) override;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      void freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) override;
+      #else
+      void freeLBState(::grpc::ClientContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) override;
+      #endif
+      void stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) override;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      void stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) override;
+      #else
+      void stopServer(::grpc::ClientContext* context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) override;
+      #endif
+      void partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response, std::function<void(::grpc::Status)>) override;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      void partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response, ::grpc::ClientUnaryReactor* reactor) override;
+      #else
+      void partitionServer(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response, ::grpc::experimental::ClientUnaryReactor* reactor) override;
       #endif
      private:
       friend class Stub;
@@ -131,8 +251,20 @@ class RecoverKV final {
     ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* PrepareAsyncgetValueRaw(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* AsyncsetValueRaw(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* PrepareAsyncsetValueRaw(::grpc::ClientContext* context, const ::recoverKV::Request& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* AsyncinitLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* PrepareAsyncinitLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* AsyncfreeLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* PrepareAsyncfreeLBStateRaw(::grpc::ClientContext* context, const ::recoverKV::StateRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* AsyncstopServerRaw(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* PrepareAsyncstopServerRaw(::grpc::ClientContext* context, const ::recoverKV::KillRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* AsyncpartitionServerRaw(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::recoverKV::Response>* PrepareAsyncpartitionServerRaw(::grpc::ClientContext* context, const ::recoverKV::PartitionRequest& request, ::grpc::CompletionQueue* cq) override;
     const ::grpc::internal::RpcMethod rpcmethod_getValue_;
     const ::grpc::internal::RpcMethod rpcmethod_setValue_;
+    const ::grpc::internal::RpcMethod rpcmethod_initLBState_;
+    const ::grpc::internal::RpcMethod rpcmethod_freeLBState_;
+    const ::grpc::internal::RpcMethod rpcmethod_stopServer_;
+    const ::grpc::internal::RpcMethod rpcmethod_partitionServer_;
   };
   static std::unique_ptr<Stub> NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
 
@@ -142,8 +274,16 @@ class RecoverKV final {
     virtual ~Service();
     // Function invoked for fetching value
     virtual ::grpc::Status getValue(::grpc::ServerContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response);
-    // Function invoked for fetching value
+    // Function invoked for setting value
     virtual ::grpc::Status setValue(::grpc::ServerContext* context, const ::recoverKV::Request* request, ::recoverKV::Response* response);
+    // Function invoked for setting state
+    virtual ::grpc::Status initLBState(::grpc::ServerContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response);
+    // Function invoked for cleaning state
+    virtual ::grpc::Status freeLBState(::grpc::ServerContext* context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response);
+    // Function invoked for terminating server instance
+    virtual ::grpc::Status stopServer(::grpc::ServerContext* context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response);
+    // Function invoked for partitioning server instance
+    virtual ::grpc::Status partitionServer(::grpc::ServerContext* context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response);
   };
   template <class BaseClass>
   class WithAsyncMethod_getValue : public BaseClass {
@@ -185,7 +325,87 @@ class RecoverKV final {
       ::grpc::Service::RequestAsyncUnary(1, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_getValue<WithAsyncMethod_setValue<Service > > AsyncService;
+  template <class BaseClass>
+  class WithAsyncMethod_initLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_initLBState() {
+      ::grpc::Service::MarkMethodAsync(2);
+    }
+    ~WithAsyncMethod_initLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status initLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestinitLBState(::grpc::ServerContext* context, ::recoverKV::StateRequest* request, ::grpc::ServerAsyncResponseWriter< ::recoverKV::Response>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(2, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_freeLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_freeLBState() {
+      ::grpc::Service::MarkMethodAsync(3);
+    }
+    ~WithAsyncMethod_freeLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status freeLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestfreeLBState(::grpc::ServerContext* context, ::recoverKV::StateRequest* request, ::grpc::ServerAsyncResponseWriter< ::recoverKV::Response>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_stopServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_stopServer() {
+      ::grpc::Service::MarkMethodAsync(4);
+    }
+    ~WithAsyncMethod_stopServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status stopServer(::grpc::ServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequeststopServer(::grpc::ServerContext* context, ::recoverKV::KillRequest* request, ::grpc::ServerAsyncResponseWriter< ::recoverKV::Response>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(4, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_partitionServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_partitionServer() {
+      ::grpc::Service::MarkMethodAsync(5);
+    }
+    ~WithAsyncMethod_partitionServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status partitionServer(::grpc::ServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestpartitionServer(::grpc::ServerContext* context, ::recoverKV::PartitionRequest* request, ::grpc::ServerAsyncResponseWriter< ::recoverKV::Response>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(5, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  typedef WithAsyncMethod_getValue<WithAsyncMethod_setValue<WithAsyncMethod_initLBState<WithAsyncMethod_freeLBState<WithAsyncMethod_stopServer<WithAsyncMethod_partitionServer<Service > > > > > > AsyncService;
   template <class BaseClass>
   class ExperimentalWithCallbackMethod_getValue : public BaseClass {
    private:
@@ -280,11 +500,199 @@ class RecoverKV final {
     #endif
       { return nullptr; }
   };
+  template <class BaseClass>
+  class ExperimentalWithCallbackMethod_initLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithCallbackMethod_initLBState() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodCallback(2,
+          new ::grpc::internal::CallbackUnaryHandler< ::recoverKV::StateRequest, ::recoverKV::Response>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response) { return this->initLBState(context, request, response); }));}
+    void SetMessageAllocatorFor_initLBState(
+        ::grpc::experimental::MessageAllocator< ::recoverKV::StateRequest, ::recoverKV::Response>* allocator) {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(2);
+    #else
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::experimental().GetHandler(2);
+    #endif
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::recoverKV::StateRequest, ::recoverKV::Response>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~ExperimentalWithCallbackMethod_initLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status initLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* initLBState(
+      ::grpc::CallbackServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* initLBState(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
+  class ExperimentalWithCallbackMethod_freeLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithCallbackMethod_freeLBState() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodCallback(3,
+          new ::grpc::internal::CallbackUnaryHandler< ::recoverKV::StateRequest, ::recoverKV::Response>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::recoverKV::StateRequest* request, ::recoverKV::Response* response) { return this->freeLBState(context, request, response); }));}
+    void SetMessageAllocatorFor_freeLBState(
+        ::grpc::experimental::MessageAllocator< ::recoverKV::StateRequest, ::recoverKV::Response>* allocator) {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(3);
+    #else
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::experimental().GetHandler(3);
+    #endif
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::recoverKV::StateRequest, ::recoverKV::Response>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~ExperimentalWithCallbackMethod_freeLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status freeLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* freeLBState(
+      ::grpc::CallbackServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* freeLBState(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
+  class ExperimentalWithCallbackMethod_stopServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithCallbackMethod_stopServer() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodCallback(4,
+          new ::grpc::internal::CallbackUnaryHandler< ::recoverKV::KillRequest, ::recoverKV::Response>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::recoverKV::KillRequest* request, ::recoverKV::Response* response) { return this->stopServer(context, request, response); }));}
+    void SetMessageAllocatorFor_stopServer(
+        ::grpc::experimental::MessageAllocator< ::recoverKV::KillRequest, ::recoverKV::Response>* allocator) {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(4);
+    #else
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::experimental().GetHandler(4);
+    #endif
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::recoverKV::KillRequest, ::recoverKV::Response>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~ExperimentalWithCallbackMethod_stopServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status stopServer(::grpc::ServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* stopServer(
+      ::grpc::CallbackServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* stopServer(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
+  class ExperimentalWithCallbackMethod_partitionServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithCallbackMethod_partitionServer() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodCallback(5,
+          new ::grpc::internal::CallbackUnaryHandler< ::recoverKV::PartitionRequest, ::recoverKV::Response>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::recoverKV::PartitionRequest* request, ::recoverKV::Response* response) { return this->partitionServer(context, request, response); }));}
+    void SetMessageAllocatorFor_partitionServer(
+        ::grpc::experimental::MessageAllocator< ::recoverKV::PartitionRequest, ::recoverKV::Response>* allocator) {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(5);
+    #else
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::experimental().GetHandler(5);
+    #endif
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::recoverKV::PartitionRequest, ::recoverKV::Response>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~ExperimentalWithCallbackMethod_partitionServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status partitionServer(::grpc::ServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* partitionServer(
+      ::grpc::CallbackServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* partitionServer(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/)
+    #endif
+      { return nullptr; }
+  };
   #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
-  typedef ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<Service > > CallbackService;
+  typedef ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<ExperimentalWithCallbackMethod_initLBState<ExperimentalWithCallbackMethod_freeLBState<ExperimentalWithCallbackMethod_stopServer<ExperimentalWithCallbackMethod_partitionServer<Service > > > > > > CallbackService;
   #endif
 
-  typedef ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<Service > > ExperimentalCallbackService;
+  typedef ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<ExperimentalWithCallbackMethod_initLBState<ExperimentalWithCallbackMethod_freeLBState<ExperimentalWithCallbackMethod_stopServer<ExperimentalWithCallbackMethod_partitionServer<Service > > > > > > ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_getValue : public BaseClass {
    private:
@@ -315,6 +723,74 @@ class RecoverKV final {
     }
     // disable synchronous version of this method
     ::grpc::Status setValue(::grpc::ServerContext* /*context*/, const ::recoverKV::Request* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_initLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_initLBState() {
+      ::grpc::Service::MarkMethodGeneric(2);
+    }
+    ~WithGenericMethod_initLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status initLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_freeLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_freeLBState() {
+      ::grpc::Service::MarkMethodGeneric(3);
+    }
+    ~WithGenericMethod_freeLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status freeLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_stopServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_stopServer() {
+      ::grpc::Service::MarkMethodGeneric(4);
+    }
+    ~WithGenericMethod_stopServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status stopServer(::grpc::ServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_partitionServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_partitionServer() {
+      ::grpc::Service::MarkMethodGeneric(5);
+    }
+    ~WithGenericMethod_partitionServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status partitionServer(::grpc::ServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
@@ -357,6 +833,86 @@ class RecoverKV final {
     }
     void RequestsetValue(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
       ::grpc::Service::RequestAsyncUnary(1, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_initLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_initLBState() {
+      ::grpc::Service::MarkMethodRaw(2);
+    }
+    ~WithRawMethod_initLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status initLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestinitLBState(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(2, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_freeLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_freeLBState() {
+      ::grpc::Service::MarkMethodRaw(3);
+    }
+    ~WithRawMethod_freeLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status freeLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestfreeLBState(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(3, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_stopServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_stopServer() {
+      ::grpc::Service::MarkMethodRaw(4);
+    }
+    ~WithRawMethod_stopServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status stopServer(::grpc::ServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequeststopServer(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(4, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_partitionServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_partitionServer() {
+      ::grpc::Service::MarkMethodRaw(5);
+    }
+    ~WithRawMethod_partitionServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status partitionServer(::grpc::ServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestpartitionServer(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(5, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -436,6 +992,158 @@ class RecoverKV final {
       { return nullptr; }
   };
   template <class BaseClass>
+  class ExperimentalWithRawCallbackMethod_initLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithRawCallbackMethod_initLBState() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodRawCallback(2,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->initLBState(context, request, response); }));
+    }
+    ~ExperimentalWithRawCallbackMethod_initLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status initLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* initLBState(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* initLBState(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
+  class ExperimentalWithRawCallbackMethod_freeLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithRawCallbackMethod_freeLBState() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodRawCallback(3,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->freeLBState(context, request, response); }));
+    }
+    ~ExperimentalWithRawCallbackMethod_freeLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status freeLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* freeLBState(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* freeLBState(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
+  class ExperimentalWithRawCallbackMethod_stopServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithRawCallbackMethod_stopServer() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodRawCallback(4,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->stopServer(context, request, response); }));
+    }
+    ~ExperimentalWithRawCallbackMethod_stopServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status stopServer(::grpc::ServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* stopServer(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* stopServer(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
+  class ExperimentalWithRawCallbackMethod_partitionServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithRawCallbackMethod_partitionServer() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodRawCallback(5,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->partitionServer(context, request, response); }));
+    }
+    ~ExperimentalWithRawCallbackMethod_partitionServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status partitionServer(::grpc::ServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* partitionServer(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* partitionServer(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
   class WithStreamedUnaryMethod_getValue : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
@@ -489,9 +1197,117 @@ class RecoverKV final {
     // replace default version of method with streamed unary
     virtual ::grpc::Status StreamedsetValue(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::recoverKV::Request,::recoverKV::Response>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<Service > > StreamedUnaryService;
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_initLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_initLBState() {
+      ::grpc::Service::MarkMethodStreamed(2,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::recoverKV::StateRequest, ::recoverKV::Response>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::recoverKV::StateRequest, ::recoverKV::Response>* streamer) {
+                       return this->StreamedinitLBState(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_initLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status initLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedinitLBState(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::recoverKV::StateRequest,::recoverKV::Response>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_freeLBState : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_freeLBState() {
+      ::grpc::Service::MarkMethodStreamed(3,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::recoverKV::StateRequest, ::recoverKV::Response>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::recoverKV::StateRequest, ::recoverKV::Response>* streamer) {
+                       return this->StreamedfreeLBState(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_freeLBState() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status freeLBState(::grpc::ServerContext* /*context*/, const ::recoverKV::StateRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedfreeLBState(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::recoverKV::StateRequest,::recoverKV::Response>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_stopServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_stopServer() {
+      ::grpc::Service::MarkMethodStreamed(4,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::recoverKV::KillRequest, ::recoverKV::Response>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::recoverKV::KillRequest, ::recoverKV::Response>* streamer) {
+                       return this->StreamedstopServer(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_stopServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status stopServer(::grpc::ServerContext* /*context*/, const ::recoverKV::KillRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedstopServer(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::recoverKV::KillRequest,::recoverKV::Response>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_partitionServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_partitionServer() {
+      ::grpc::Service::MarkMethodStreamed(5,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::recoverKV::PartitionRequest, ::recoverKV::Response>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::recoverKV::PartitionRequest, ::recoverKV::Response>* streamer) {
+                       return this->StreamedpartitionServer(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_partitionServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status partitionServer(::grpc::ServerContext* /*context*/, const ::recoverKV::PartitionRequest* /*request*/, ::recoverKV::Response* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedpartitionServer(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::recoverKV::PartitionRequest,::recoverKV::Response>* server_unary_streamer) = 0;
+  };
+  typedef WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<WithStreamedUnaryMethod_initLBState<WithStreamedUnaryMethod_freeLBState<WithStreamedUnaryMethod_stopServer<WithStreamedUnaryMethod_partitionServer<Service > > > > > > StreamedUnaryService;
   typedef Service SplitStreamedService;
-  typedef WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<Service > > StreamedService;
+  typedef WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<WithStreamedUnaryMethod_initLBState<WithStreamedUnaryMethod_freeLBState<WithStreamedUnaryMethod_stopServer<WithStreamedUnaryMethod_partitionServer<Service > > > > > > StreamedService;
 };
 
 }  // namespace recoverKV

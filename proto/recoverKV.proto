@@ -9,18 +9,51 @@ service RecoverKV {
     // Function invoked for fetching value
     rpc getValue (Request) returns (Response) {}
 
-    // Function invoked for fetching value
+    // Function invoked for setting value
     rpc setValue (Request) returns (Response) {}
+
+    // Function invoked for setting state
+    rpc initLBState (StateRequest) returns (Response) {}
+
+    // Function invoked for cleaning state
+    rpc freeLBState (StateRequest) returns (Response) {}
+
+    // Function invoked for terminating server instance
+    rpc stopServer (KillRequest) returns (Response) {}
+
+    // Function invoked for partitioning server instance
+    rpc partitionServer (PartitionRequest) returns (Response) {}
 }
 
 // The request message containing key
 message Request {
-    string key = 1;
-    string value = 2;
+	string objectID = 1;
+    string key = 2;
+    string value = 3;
 }
 
-// The response message containing response
+// The response message from servers
 message Response {
     string value = 1;
     int32 successCode = 2;
+}
+
+// For setting state at the load balancer
+message StateRequest {
+	string objectID = 1;
+	string serversList = 2;
+}
+
+// For stoping a server instance
+message KillRequest {
+	string objectID = 1;
+	string serverName = 2;
+	int32 cleanType = 3;
+}
+
+// For partitioning network of a server instance
+message PartitionRequest {
+	string objectID = 1;
+	string serverName = 2;
+	string reachable = 3;
 }
