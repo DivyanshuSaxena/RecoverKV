@@ -5,6 +5,7 @@ gen: protoc build
 init:
 	rm -rf go.mod
 	go mod init recoverKV
+	mkdir -p log data
 
 protoc:
 	# Generate the protobuf files using the ../proto directory

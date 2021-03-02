@@ -11,6 +11,7 @@ import (
 	"sync"
 	"math/rand"
 	"google.golang.org/grpc"
+	"strconv"
 )
 
 var ip_addr string
@@ -21,10 +22,11 @@ var lb_ip_addr string
 var lb_port string
 
 rand.Seed(time.Now().Unix()) 
-rec_cmplt_chk := 2 // In seconds
 var rec_cmplt bool
 var rec_mu sync.Mutex
 rec_cond :=sync.NewCond(&rec_mu)
+db_path := "./data/recover.db"
+// Refer persist.go for log path
 
 // setter and getter for the mode can be helpful for LB
 server_mode := "DEAD" // 3 modes, DEAD->ZOMBIE->ALIVE
@@ -69,6 +71,8 @@ func (s *server) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 	key := in.GetKey()
 	newVal := in.GetValue()
+	//TODO: Verify
+	uid := in.GetObjectID()
 	//log.Printf("SetValue Received: %v:%v\n", key, newVal)
 	var successCode int32 = 0
 
@@ -82,8 +86,8 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 		successCode = 1
 	}
 
-	//TODO: Pass unique id here.
-	UpdateKey(key, newVal, db)
+	// TODO: check if bellow true of false before returning.
+	UpdateKey(key, newVal, uid, db)
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
 
@@ -105,18 +109,18 @@ func PrintStartMsg() {
 
 // Recovery request handler 
 func (s server) FetchQueries(in *pb.Request, srv pb.StreamService_FetchResponseServer) error {
-	fmt.Println("[Recovery] Responding to server " in.Address)
-	log.Println("[Recovery] Responding to server " in.Address)
+	fmt.Println("[Recovery] Responding to server "+in.Address)
+	log.Println("[Recovery] Responding to server "+in.Address)
 
 	ferr := 0
 	// From the given id search for it in the log and return that line from log file.
 	for qid := in.FromID; qid > qid-in.QLength ; qid-- {
-		que := SearchQueryLog(CurrLogPath(), qid)
-		if que == nil {
+		que := SearchQueryLog(qid)
+		if que == "" {
 			// if globalID is not seen in log sleep for 3 seconds and try again
 			time.Sleep(3 * time.Second)	
 			// hopefully by now log file has the qid we are interested in.
-			que = SearchQueryLog(CurrLogPath(), qid)
+			que = SearchQueryLog(qid)
 			// if still nil return client error
 			if que == nil {
 				que = ""
@@ -165,7 +169,7 @@ func rpcRequestLogs(peer_addr string, count int, from int) bool{
 				log.Fatal("[Recovery] Buddy server has an error.")
 				return
 			}
-			if ApplyQuery(CurrLogPath(), resp.Query) {
+			if ApplyQuery(resp.Query) {
 				log.Fatalf("[Recovery] failed to apply query %x : ABORTING recovery.", resp.Query)
 			}
 			fmt.Printf("[Recovery] Replayed query %s -- ", resp.Query)
@@ -197,7 +201,7 @@ func recoveryStage() {
 	// Combine step 1 & 2 in a single func in LB. 
 	global_uid := LB.enablePUTandReturnUID()
 
-	//Step 3.
+	//Step 3. // Note not error checking FetchLocalUID
 	lagging := global_uid - FetchLocalUID()
 	if lagging == 0 {
 		// nothing to recover
@@ -264,12 +268,12 @@ func main() {
 	}
 	// Main LB facing server
 	s := grpc.NewServer()
-	// start db test.db
+
 	var ret bool
-	db, ret = InitDB("/tmp/test.db")
+	db, ret = InitDB(db_path)
 	if ret {
 		// load the stored data to table
-		if table.LoadKV("/tmp/test.db", db) {
+		if table.LoadKV(db_path, db) {
 			pb.RegisterRecoverKVServer(s, &server{})
 			PrintStartMsg(port)
 			if err := s.Serve(lis); err != nil {
