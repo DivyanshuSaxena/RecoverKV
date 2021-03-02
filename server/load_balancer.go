@@ -12,6 +12,21 @@ import (
 	pb "recoverKV/gen/recoverKV"
 )
 
+/*
+* Servers can be in three modes.
+* 	DEAD - 		Not responding or marked to be killed
+*	ZOMBIE - 	responding but recovering; Only supports PUT and
+			 	can't be used to recover other ZOMBIE servers.
+* 	ALIVE -		Responds to all requests and can be used to
+				recover ZOMBIE servers.
+
+Load balancer must maintain 
+---------------------------------------------------------------------------------
+ID 		|ip_addr 		|serv_port		|rec_port 		| mode 		| peer_list	|
+---------------------------------------------------------------------------------
+peer_list = initially everyone but this can change as client requests.
+*/
+
 // Defines the port to run and total nodes in system
 const (
 	port  = ":50050"
@@ -198,6 +213,8 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 	////////////////////////////////////////////////////
 	//TODO: Contact ANY ALIVE server grpc object and get value,successCode for this key
+	// Retry twice if request failed. If server did not respond mark server as DEAD!
+	// Next retry same query from another ALIVE server
 	log.Printf("GetValue Received: %v\n", in.GetKey())
 	log.Printf("Server to contact: %v\n", serverData.servers[rand.Intn(nodes)])
 
@@ -223,6 +240,8 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	////////////////////////////////////////////////////
 	//TODO: Contact ALL alive servers and update value,successCode for this key
 	// [!] Also generate an ID for this Query
+	// if server does not respond back, don't bother. However, if server didn't respond
+	// twice in a row then mark that server DEAD!
 	log.Printf("SetValue Received: %v:%v\n", in.GetKey(), in.GetValue())
 
 	for _, serverName := range serverData.servers {

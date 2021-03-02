@@ -27,7 +27,7 @@ service RecoverKV {
 
 // The request message containing key
 message Request {
-	string objectID = 1;
+	int64 objectID = 1;
     string key = 2;
     string value = 3;
 }
@@ -40,20 +40,41 @@ message Response {
 
 // For setting state at the load balancer
 message StateRequest {
-	string objectID = 1;
+	int64 objectID = 1;
 	string serversList = 2;
 }
 
 // For stoping a server instance
 message KillRequest {
-	string objectID = 1;
+	int64 objectID = 1;
 	string serverName = 2;
 	int32 cleanType = 3;
 }
 
 // For partitioning network of a server instance
 message PartitionRequest {
-	string objectID = 1;
+	int64 objectID = 1;
 	string serverName = 2;
 	string reachable = 3;
+}
+
+service StreamService {
+  rpc FetchQueries (RecRequest) returns (stream RecResponse) {}
+}
+
+
+// For recovery:
+// qLenght  is number of queries needed by caller
+// fromId   is the last global uid as of last request from caller
+message RecRequest {
+    int32 qLength = 1;
+    int64 fromId = 2;
+    string address = 3;
+}
+
+// query is the string of query with value.
+// foundError is if any issue happened while finding the requested query.
+message RecResponse {
+  string query = 1;
+  int32 foundError = 2;
 }
