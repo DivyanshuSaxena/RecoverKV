@@ -34,7 +34,7 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		return nil, false
 	}
 
-	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS store (key TEXT PRIMARY KEY, value TEXT)")
+	statement, _ := database.Prepare("CREATE TABLE IF NOT EXISTS store (key TEXT PRIMARY KEY, value TEXT, uid TEXT)")
 	defer statement.Close()
 
 	_, err = statement.Exec()
@@ -43,7 +43,7 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		return nil, false
 	}
 
-	updateStatement, err = database.Prepare("REPLACE INTO store (key, value) VALUES (?, ?)")
+	updateStatement, err = database.Prepare("REPLACE INTO store (key, value, uid) VALUES (?, ?, ?)")
 	if checkErr(err) {
 		log.Println("=== UPDATE QUERY PREPATION FAILED:", err.Error())
 		return nil, false
@@ -53,15 +53,16 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 	return database, true
 }
 
-// UpdateKey updates the `value` for `key` in DB
-func UpdateKey(key string, value string, database *sql.DB) bool {
+// UpdateKey updates the `value` for `key` in DB.
+// It also stores the uid of last query that modified it.
+func UpdateKey(key string, value string, database *sql.DB, uid int64) bool {
 
-	_, err := updateStatement.Exec(key, value)
+	_, err := updateStatement.Exec(key, value, uid)
 
 	if checkErr(err) {
 		log.Println("=== KEY UPDATE FAILED:", err.Error())
 	}
-
+	//write to own log file
 	return true
 }
 
@@ -110,3 +111,26 @@ func checkErr(err error) bool {
 	}
 	return false
 }
+
+// Return the last UID
+func FetchLocalUID(path string)
+
+
+func CurrLogPath() string
+
+// Logs query to a log file.
+func logQuery(path string, query string) bool
+
+// Apply a given query if it's latest for the key.
+// return false only if failed applying.
+func ApplyQuery(path string, ) bool
+
+// Searches the entire log file for uid and returns that line.
+func SearchQueryLog(path string, uid int64) string{
+
+}
+
+
+
+// TODO: For later
+func compactLogs(path string) bool

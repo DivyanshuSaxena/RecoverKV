@@ -57,3 +57,18 @@ message PartitionRequest {
 	string serverName = 2;
 	string reachable = 3;
 }
+
+service StreamService {
+  rpc FetchQueries (RecRequest) returns (stream RecResponse) {}
+}
+
+message RecRequest {
+    int32 qLength = 1;
+    int32 fromId = 2;
+    string address = 3;
+}
+
+message RecResponse {
+  string query = 1;
+  int32 foundError = 2;
+}
