@@ -30,7 +30,7 @@ type ServerInstance struct {
 	name         string
 	conn         pb.InternalClient
 	recPort      string
-	mode         int
+	mode         int32
 	blockedPeers []int
 }
 
@@ -145,7 +145,7 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	emptyMsg := new(emptypb.Empty)
-	resp, err := serverList[serverID].conn.StopServer(privateCtx, emptyMsg)
+	_, err := serverList[serverID].conn.StopServer(privateCtx, emptyMsg)
 
 	// check it it exists, if not successCode = -1
 	if err != nil {
@@ -211,7 +211,7 @@ func (lb *loadBalancer) FreeLBState(ctx context.Context, in *pb.StateRequest) (*
 	clientID := in.GetClientID()
 	log.Printf("Received in Free LB: %v\n", clientID)
 
-	serverData, prs := clientMap[clientID]
+	_, prs := clientMap[clientID]
 	if !prs {
 		log.Printf("Client ID does not exists!: %v\n", clientID)
 		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID does not exist")
@@ -299,6 +299,49 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	}
 
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
+}
+
+func (lb *loadBalancer) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack, error) {
+	// TODO: Any corner cases (or error handling) required here?
+	serverName := in.GetServerName()
+	updatedStatus := in.GetNewStatus()
+
+	// Update status in global map
+	serverID := serverNameMap[serverName]
+	serverList[serverID].mode = updatedStatus
+
+	return &pb.Ack{}, nil
+}
+
+func (lb *loadBalancer) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) (*pb.AlivePeersResponse, error) {
+	// TODO: Any corner cases (or error handling) required here?
+	serverName := in.GetServerName()
+	serverID := serverNameMap[serverName]
+
+	var aliveList string = ""
+	// Iterate over all servers, and append into a string
+	for _, peerInstance := range serverList {
+		if peerInstance.mode == 1 {
+			// Server is alive. Check if it is not in blockedPeers
+			found := false
+			for _, blocked := range serverList[serverID].blockedPeers {
+				if peerInstance.serverID == blocked {
+					found = true
+				}
+			}
+
+			// If not found - Add to Alive list
+			if !found {
+				if len(aliveList) == 0 {
+					aliveList = aliveList + peerInstance.name
+				} else {
+					aliveList = aliveList + "," + peerInstance.name
+				}
+			}
+		}
+	}
+
+	return &pb.AlivePeersResponse{AliveList: aliveList}, nil
 }
 
 func main() {

@@ -27,7 +27,7 @@ service RecoverKV {
     rpc partitionServer (PartitionRequest) returns (Response) {}
 
     // Mark server alive/zombie
-    rpc markMe (MarkStatus) returns (google.protobuf.Empty) {}
+    rpc markMe (MarkStatus) returns (Ack) {}
 
     // Fetch Alive peers of a server
     rpc fetchAlivePeers (ServerInfo) returns (AlivePeersResponse) {}
@@ -106,6 +106,8 @@ message ServerInfo {
 message AlivePeersResponse {
     string aliveList = 1;
 }
+
+message Ack {}
 
 // For recovery:
 // qLength  is number of queries needed by caller
