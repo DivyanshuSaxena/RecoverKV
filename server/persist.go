@@ -219,6 +219,7 @@ func searchFile(uid int64, filepath string) string{
 	return ""
 }
 
+
 // Searches the entire log file for uid and returns that line.
 // How many log files should this search, in what order
 func SearchQueryLog(uid int64) string{

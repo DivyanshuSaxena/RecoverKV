@@ -188,8 +188,8 @@ func rpcRequestLogs(peer_addr string, count int, from int) bool{
 /**
 * Recovery stage:
 1. Don't serve GETs yet! PUTs can be served.
-2. First check with LB for latest uid
-3. subtract cur_uid - latest_uid to get new set of queries
+2. First check with LB for latest global uid
+3. subtract cur_uid - latest_global_uid to get new set of queries
 4. Next broadcast request to a random server for new queries
 	* Not broadcasting to all to reduce wasting cycles.
 5. Receive and apply each query if uid of key X is > current uid of key X
@@ -197,12 +197,12 @@ func rpcRequestLogs(peer_addr string, count int, from int) bool{
 6. Recovery stage is done once all new query set is applied. Now enable GETs. Do this in main.
 * Time this and report..
 */
-func recoveryStage() {
+func recoveryStage(local_latest_uid int64) {
 	// Combine step 1 & 2 in a single func in LB. 
-	global_uid := LB.enablePUTandReturnUID()
+	global_uid := LB.markMeZombie()
 
 	//Step 3. // Note not error checking FetchLocalUID
-	lagging := global_uid - FetchLocalUID()
+	lagging := global_uid - local_latest_uid
 	if lagging == 0 {
 		// nothing to recover
 		rec_mu.Lock()
@@ -281,7 +281,7 @@ func main() {
 			}
 			server_mode = "ZOMBIE"
 			rec_cmplt = false
-			go recoveryStage()
+			go recoveryStage(FetchLocalUID())
 			// In another thread wait on completion and 
 			// if rec_cmplt is true then enable GET queries.
 			go func(){
@@ -296,7 +296,7 @@ func main() {
 				if rec_cmplt {
 					// Recovery success
 					// Step 6.
-					LB.enableALL()
+					LB.markMeAlive()
 					server_mode = "ALIVE"
 				} else {
 					// Recovery failed because either,

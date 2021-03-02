@@ -21,10 +21,10 @@ import (
 				recover ZOMBIE servers.
 
 Load balancer must maintain 
----------------------------------------------------------------------
-ID 		|ip_addr 		|serv_port		|rec_port 		| mode 		|
----------------------------------------------------------------------
-
+---------------------------------------------------------------------------------
+ID 		|ip_addr 		|serv_port		|rec_port 		| mode 		| peer_list	|
+---------------------------------------------------------------------------------
+peer_list = initially everyone but this can change as client requests.
 */
 
 // Defines the port to run and total nodes in system
