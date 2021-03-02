@@ -87,6 +87,7 @@ func PrintStartMsg(port string) {
 	fmt.Println("Server started successfully on port" + port)
 }
 
+// RunServer runs a gRPC server. Function can be called as a go routine
 func main() {
 	fmt.Println("Starting server execution")
 

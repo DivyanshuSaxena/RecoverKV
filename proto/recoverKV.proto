@@ -1,10 +1,12 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 package recoverKV;
 
 option go_package="gen/recoverKV";
 
-// Defines the service
+// Defines the core service
 service RecoverKV {
     // Function invoked for fetching value
     rpc getValue (Request) returns (Response) {}
@@ -23,11 +25,31 @@ service RecoverKV {
 
     // Function invoked for partitioning server instance
     rpc partitionServer (PartitionRequest) returns (Response) {}
+
+    // Mark server alive/zombie
+    rpc markMe (MarkStatus) returns (google.protobuf.Empty) {}
+
+    // Fetch Alive peers of a server
+    rpc fetchAlivePeers (ServerInfo) returns (AlivePeersResponse) {}
+}
+
+// Defines the internal communication service
+service Internal {
+    rpc FetchQueries (RecRequest) returns (stream RecResponse) {}
+
+    // Function invoked for fetching value
+    rpc getValue (InternalRequest) returns (InternalResponse) {}
+
+    // Function invoked for setting value
+    rpc setValue (InternalRequest) returns (InternalResponse) {}
+
+    // Function for stopping server
+    rpc stopServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
 
 // The request message containing key
 message Request {
-	string objectID = 1;
+	string clientID = 1;
     string key = 2;
     string value = 3;
 }
@@ -40,20 +62,63 @@ message Response {
 
 // For setting state at the load balancer
 message StateRequest {
-	string objectID = 1;
+	string clientID = 1;
 	string serversList = 2;
 }
 
 // For stoping a server instance
 message KillRequest {
-	string objectID = 1;
+	string clientID = 1;
 	string serverName = 2;
 	int32 cleanType = 3;
 }
 
 // For partitioning network of a server instance
 message PartitionRequest {
-	string objectID = 1;
+	string clientID = 1;
 	string serverName = 2;
 	string reachable = 3;
+}
+
+// Internal RPC messages
+// The request message containing key
+message InternalRequest {
+    int64 queryID = 1;
+    string key = 2;
+    string value = 3;
+}
+
+// The response message containing response
+message InternalResponse {
+    string value = 1;
+    int32 successCode = 2;
+}
+
+message MarkStatus {
+    string serverName = 1;
+    int32 newStatus = 2;
+}
+
+message ServerInfo {
+    string serverName = 1;
+}
+
+message AlivePeersResponse {
+    string aliveList = 1;
+}
+
+// For recovery:
+// qLength  is number of queries needed by caller
+// fromId   is the last global uid as of last request from caller
+message RecRequest {
+    int32 qLength = 1;
+    int64 fromId = 2;
+    string address = 3;
+}
+
+// query is the string of query with value.
+// foundError is if any issue happened while finding the requested query.
+message RecResponse {
+  string query = 1;
+  int32 foundError = 2;
 }

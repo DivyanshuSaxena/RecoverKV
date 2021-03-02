@@ -7,9 +7,13 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"time"
+
+	pb "recoverKV/gen/recoverKV"
+
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	"google.golang.org/grpc"
-	pb "recoverKV/gen/recoverKV"
 )
 
 // Defines the port to run and total nodes in system
@@ -18,61 +22,97 @@ const (
 	nodes = 3
 )
 
-// Holds server states
-type ServerInstances struct {
-	////////////////////////////////////////////////////
-	//TODO: servers map[string]RecoverKVClient <--- this is what we should used  for contacting servers
-	////////////////////////////////////////////////////
-	servers []string
+// ServerInstance holds server states
+// serverID is the index of the server in the serverList
+// mode can take one of: 1: ALIVE, 0: ZOMBIE, -1: DEAD
+type ServerInstance struct {
+	serverID     int
+	name         string
+	conn         pb.InternalClient
+	recPort      string
+	mode         int
+	blockedPeers []int
 }
 
-// Contains mapping of client ID <-> server instances
-type clientMAP map[string]ServerInstances
+// ClientPermission holds server ids that a client can contact
+type ClientPermission struct {
+	// We are holding the server ids (to serverMap) here. The objects need not be duplicated
+	servers []int
+}
+
+// Contains mapping of client ID <-> client permission instances
+type clientMAP map[string]ClientPermission
+
+// Contains mapping of server Names <-> server IDs
+type serverNameMAP map[string]int
 
 var (
-	table = make(clientMAP)
+	queryID       int64 = 0
+	clientMap           = make(clientMAP)
+	serverNameMap       = make(serverNameMAP)
+	serverList          = make([]ServerInstance, nodes)
+	address             = [3]string{":50051", ":50052", ":50053"}
+	recPort             = [3]string{":50054", ":50055", ":50056"}
 )
 
 type loadBalancer struct {
 	pb.UnimplementedRecoverKVServer
 }
 
+// CanContactServer checks whether a given clientID can contact the given server.
+// Returns 1 if it can, 0 if not. And returns -1 if clientID is invalid.
+func CanContactServer(clientID string, serverName string) int {
+	clientData, prs := clientMap[clientID]
+	if !prs {
+		return -1
+	}
+
+	// Check if client is allowed to interact with the server name
+	found := 0
+	for _, allowedServerID := range clientData.servers {
+		if serverName == serverList[allowedServerID].name {
+			found = 1
+		}
+	}
+
+	return found
+}
+
 func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
 
 	var successCode int32 = 0
 
-	clientID := in.GetObjectID()
+	clientID := in.GetClientID()
 	serverName := in.GetServerName()
 	reachable := in.GetReachable()
+	reachableList := strings.Split(reachable, ",")
 	log.Printf("Received in stop server: %v:%v:%v\n", clientID, serverName, reachable)
 
-	serverData, prs := table[clientID]
-	if !prs {
+	ret := CanContactServer(clientID, serverName)
+	if ret == -1 {
 		log.Printf("Client ID does not exists!: %v\n", clientID)
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Client ID does not exists!")
-	}
-
-	// Check if client is allowed to interact with the server name
-	found := false
-	for _, allowedServer := range serverData.servers {
-		if serverName == allowedServer {
-			found = true
-		}
-	}
-	if !found {
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID does not exist")
+	} else if ret == 0 {
 		log.Printf("Client ID %v cannot interact with this server: %v\n", clientID, serverName)
 		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Permission model error")
 	}
 
 	////////////////////////////////////////////////////
-	//TODO: Check if client can interact with servers in reachable list
-	//TODO: if no, successCode -1
-	//TODO: If yes, Contact server and update its local membership table
+	// COMPLETED: Check if client can interact with servers in reachable list
+	blockedPeers := make([]int, 0)
+	for _, reachableName := range reachableList {
+		ret := CanContactServer(clientID, reachableName)
+		if ret != 1 {
+			// COMPLETED: if no, successCode -1
+			log.Printf("Client ID %v cannot interact with this server: %v\n", clientID, reachableName)
+			return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Permission model error")
+		}
+		blockedPeers = append(blockedPeers, serverNameMap[reachableName])
+	}
 
-	// serverData[serverName] <- send partition call to this
-	// check it it exists, if not successCode = -1
-	log.Println(serverData)
-	////////////////////////////////////////////////////
+	// COMPLETED: If yes, Contact server (IMP: No need to contact server) and update its local membership clientMap
+	serverID := serverNameMap[serverName]
+	serverList[serverID].blockedPeers = blockedPeers
 
 	// Server Successfully Partitioned
 	return &pb.Response{Value: "", SuccessCode: successCode}, nil
@@ -82,38 +122,41 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 
 	var successCode int32 = 0
 
-	clientID := in.GetObjectID()
+	clientID := in.GetClientID()
 	serverName := in.GetServerName()
 	cleanType := in.GetCleanType()
 	log.Printf("Received in stop server: %v:%v:%v\n", clientID, serverName, cleanType)
 
-	serverData, prs := table[clientID]
-	if !prs {
+	ret := CanContactServer(clientID, serverName)
+	if ret == -1 {
 		log.Printf("Client ID does not exists!: %v\n", clientID)
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Client ID does not exists!")
-	}
-
-	// Check if client is allowed to interact with the server name
-	found := false
-	for _, allowedServer := range serverData.servers {
-		if serverName == allowedServer {
-			found = true
-		}
-	}
-	if !found {
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID does not exist")
+	} else if ret == 0 {
 		log.Printf("Client ID %v cannot interact with this server: %v\n", clientID, serverName)
 		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Permission model error")
 	}
 
-	////////////////////////////////////////////////////
-	//TODO: Send a stop GRPC call to that particular server. It will exit based on
+	// COMPLETED: Send a stop GRPC call to that particular server. It will exit based on
 	// the clean type.
+	serverID := serverNameMap[serverName]
 
-	// serverData[serverName] <- send kill call to this
+	// serverList[serverID] <- send kill call to this
+	// TODO: Remove timeout from here if possible
+	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	emptyMsg := new(emptypb.Empty)
+	resp, err := serverList[serverID].conn.StopServer(privateCtx, emptyMsg)
+
 	// check it it exists, if not successCode = -1
+	if err != nil {
+		// TODO: Check if this will respond back in case the server has crashed
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("server stop failed")
+	}
 
-	//TODO: Change input server name status to unavailable globally as well
-	////////////////////////////////////////////////////
+	// COMPLETED: Change input server name status to unavailable globally as well
+	if cleanType == 1 {
+		serverList[serverID].mode = -1
+	}
 
 	// Server Successfully shutdown
 	return &pb.Response{Value: "", SuccessCode: successCode}, nil
@@ -123,35 +166,40 @@ func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*
 
 	var successCode int32 = 0
 
-	clientID := in.GetObjectID()
-	serverList := in.GetServersList()
-	log.Printf("Received in Init: %v:%v\n", clientID, serverList)
+	clientID := in.GetClientID()
+	requestList := in.GetServersList()
+	log.Printf("Received in Init: %v:%v\n", clientID, requestList)
 
-	_, prs := table[clientID]
+	_, prs := clientMap[clientID]
 	if prs {
 		log.Printf("Client ID already exists!: %v\n", clientID)
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Client ID already exists!")
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID already exist")
 	}
 
-	//TODO: Instead of adding server names we can just add grpc server objects, which
+	// COMPLETED: Instead of adding server names we can just add grpc server objects, which
 	// we initialzed in main
 
-	// Create a new conn state
-	serverListSlice := strings.Split(serverList, ",")
-	serverData := ServerInstances{
-		servers: serverListSlice[:len(serverListSlice)-1],
-	}
+	// Get the servers that the client requested
+	serverListSlice := strings.Split(requestList, ",")
 
-	////////////////////////////////////////////////////
-	//TODO: Add the grpc server objcts to the table map
-	for _, serverName := range serverData.servers {
-		log.Printf("Server to contact: %v\n", serverName)
-		//TODO: On failure with grpc conn, return -1 successcode
+	// Get the serverIDs that must be added in the Client Permission object
+	servers := make([]int, len(serverListSlice))
+
+	for i, serverName := range serverListSlice {
+		serverID := serverNameMap[serverName]
+
+		// Check if the requested server is alive
+		if serverList[serverID].mode == 1 {
+			servers[i] = serverID
+			log.Printf("Server to contact: %v\n", serverName)
+		} else {
+			// COMPLETED: On failure with grpc conn, return -1 successcode
+			return &pb.Response{Value: "", SuccessCode: -1}, nil
+		}
 	}
-	////////////////////////////////////////////////////
 
 	// GRPC connection to servers successful, save state
-	table[clientID] = serverData
+	clientMap[clientID] = ClientPermission{servers: servers}
 
 	return &pb.Response{Value: "", SuccessCode: successCode}, nil
 }
@@ -160,25 +208,18 @@ func (lb *loadBalancer) FreeLBState(ctx context.Context, in *pb.StateRequest) (*
 
 	var successCode int32 = 0
 
-	clientID := in.GetObjectID()
+	clientID := in.GetClientID()
 	log.Printf("Received in Free LB: %v\n", clientID)
 
-	serverData, prs := table[clientID]
+	serverData, prs := clientMap[clientID]
 	if !prs {
 		log.Printf("Client ID does not exists!: %v\n", clientID)
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Client ID does not exists!")
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID does not exist")
 	}
 
-	////////////////////////////////////////////////////
-	//TODO: Close GRPC connection with everyone in servers list
-	for _, serverName := range serverData.servers {
-		log.Printf("Server to contact: %v\n", serverName)
-		//TODO: On failure with grpc shutdown, return -1 successcode
-	}
-	////////////////////////////////////////////////////
-
-	// GRPC connection to servers successfully closed, free state
-	delete(table, clientID)
+	// GRPC connection to servers successfully closed (Not needed now)
+	// Free client state
+	delete(clientMap, clientID)
 
 	return &pb.Response{Value: "", SuccessCode: successCode}, nil
 }
@@ -186,23 +227,38 @@ func (lb *loadBalancer) FreeLBState(ctx context.Context, in *pb.StateRequest) (*
 func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 
 	var successCode int32 = 0
+	var val string = ""
 
-	clientID := in.GetObjectID()
+	clientID := in.GetClientID()
 	log.Printf("Object ID Received in Get: %v\n", clientID)
 
-	serverData, prs := table[clientID]
+	clientData, prs := clientMap[clientID]
 	if !prs {
 		log.Printf("Cannot find Client ID: %v\n", clientID)
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Client ID does not exists!")
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID does not exist")
 	}
 
 	////////////////////////////////////////////////////
-	//TODO: Contact ANY ALIVE server grpc object and get value,successCode for this key
-	log.Printf("GetValue Received: %v\n", in.GetKey())
-	log.Printf("Server to contact: %v\n", serverData.servers[rand.Intn(nodes)])
+	// COMPLETED: Contact ANY ALIVE server grpc object and get value,successCode for this key
+	key := in.GetKey()
+	log.Printf("GetValue Received: %v\n", key)
 
-	val := "NULL"
-	////////////////////////////////////////////////////
+	// Find any alive server
+	serverID := clientData.servers[rand.Intn(nodes)]
+	for serverList[serverID].mode != 1 {
+		serverID = clientData.servers[rand.Intn(nodes)]
+	}
+	serverToContact := serverList[serverID]
+
+	// Send request to the respective server
+	// TODO: Use the timeout
+	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	resp, err := serverToContact.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
+	if err == nil {
+		val = resp.GetValue()
+		successCode = resp.GetSuccessCode()
+	}
 
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
@@ -210,27 +266,37 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 
 	var successCode int32 = 0
+	var val string = "NULL"
 
-	clientID := in.GetObjectID()
+	clientID := in.GetClientID()
 	log.Printf("Object ID Received in Set: %v\n", clientID)
 
-	serverData, prs := table[clientID]
+	_, prs := clientMap[clientID]
 	if !prs {
 		log.Printf("Cannot find Client ID: %v\n", clientID)
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Client ID does not exists!")
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID does not exist")
 	}
 
-	////////////////////////////////////////////////////
-	//TODO: Contact ALL alive servers and update value,successCode for this key
-	// [!] Also generate an ID for this Query
+	// Contact ALL alive servers and update value,successCode for this key
 	log.Printf("SetValue Received: %v:%v\n", in.GetKey(), in.GetValue())
 
-	for _, serverName := range serverData.servers {
-		log.Printf("Server to contact: %v\n", serverName)
+	// [!] Also generate an ID for this Query
+	// TODO: Handle concurrent queries (Use locks)
+	queryID = queryID + 1
+	for _, server := range serverList {
+		if server.mode == 1 {
+			// Send request to the respective server
+			// TODO: Use the timeout
+			privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+			resp, err := server.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: queryID, Key: in.GetKey(), Value: in.GetValue()})
+			if err == nil {
+				// TODO: Do something if inconsistent values read from different servers
+				val = resp.GetValue()
+				successCode = resp.GetSuccessCode()
+			}
+		}
 	}
-
-	val := "NULL"
-	////////////////////////////////////////////////////
 
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
 }
@@ -243,6 +309,25 @@ func main() {
 	// if they are alive or dead (dead being categorized by timeout or fail-stop)
 	// This makes sure we always make three conn (independent of number of client joining)
 	////////////////////////////////////////////////////
+
+	// Set up distinct connections to the servers.
+	for i := 0; i < nodes; i++ {
+		// TODO: Should we run servers as entirely different processes?
+		name := "localhost" + address[i]
+
+		// Save into global data structures
+		serverNameMap[name] = i
+
+		// Assumes that the servers are already running
+		conn, err := grpc.Dial(name, grpc.WithInsecure(), grpc.WithBlock())
+		if err != nil {
+			log.Fatalf("did not connect: %v\n", err)
+		}
+		defer conn.Close()
+		c := pb.NewInternalClient(conn)
+		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 1}
+		serverList[i] = s
+	}
 
 	// Start the load balancer and listen for requests
 	lis, err := net.Listen("tcp", "localhost"+port)
