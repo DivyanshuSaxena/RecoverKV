@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	pb "recoverKV/gen/recoverKV"
@@ -23,8 +24,10 @@ const (
 )
 
 // ServerInstance holds server states
-// serverID is the index of the server in the serverList
-// mode can take one of: 1: ALIVE, 0: ZOMBIE, -1: DEAD
+// serverID	- is the index of the server in the serverList
+// mode 		- can take one of: 1: ALIVE, 0: ZOMBIE, -1: DEAD
+// lock 		- is a Mutex lock over the struct so that concurrent operations on the struct are safe.
+// 						Enforces mutual exclusion over mode and blockedPeers
 type ServerInstance struct {
 	serverID     int
 	name         string
@@ -32,6 +35,7 @@ type ServerInstance struct {
 	recPort      string
 	mode         int32
 	blockedPeers []int
+	lock         sync.Mutex
 }
 
 // ClientPermission holds server ids that a client can contact
@@ -48,6 +52,7 @@ type serverNameMAP map[string]int
 
 var (
 	queryID       int64 = 0
+	queryIDMu           = sync.Mutex{}
 	clientMap           = make(clientMAP)
 	serverNameMap       = make(serverNameMAP)
 	serverList          = make([]ServerInstance, nodes)
@@ -70,6 +75,7 @@ func CanContactServer(clientID string, serverName string) int {
 	// Check if client is allowed to interact with the server name
 	found := 0
 	for _, allowedServerID := range clientData.servers {
+		// ServerInstance.name is Read Only -- hence, not needed to be protected by a lock
 		if serverName == serverList[allowedServerID].name {
 			found = 1
 		}
@@ -111,8 +117,11 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 	}
 
 	// COMPLETED: If yes, Contact server (IMP: No need to contact server) and update its local membership clientMap
-	serverID := serverNameMap[serverName]
-	serverList[serverID].blockedPeers = blockedPeers
+	server := serverList[serverNameMap[serverName]]
+
+	server.lock.Lock()
+	server.blockedPeers = blockedPeers
+	server.lock.Unlock()
 
 	// Server Successfully Partitioned
 	return &pb.Response{Value: "", SuccessCode: successCode}, nil
@@ -145,6 +154,7 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	emptyMsg := new(emptypb.Empty)
+	// ServerInstance.conn is Read only -- hence, not protected by a lock
 	_, err := serverList[serverID].conn.StopServer(privateCtx, emptyMsg)
 
 	// check it it exists, if not successCode = -1
@@ -155,7 +165,9 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 
 	// COMPLETED: Change input server name status to unavailable globally as well
 	if cleanType == 1 {
+		serverList[serverID].lock.Lock()
 		serverList[serverID].mode = -1
+		serverList[serverID].lock.Unlock()
 	}
 
 	// Server Successfully shutdown
@@ -189,7 +201,11 @@ func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*
 		serverID := serverNameMap[serverName]
 
 		// Check if the requested server is alive
-		if serverList[serverID].mode == 1 {
+		serverList[serverID].lock.Lock()
+		mode := serverList[serverID].mode
+		serverList[serverID].lock.Unlock()
+
+		if mode == 1 {
 			servers[i] = serverID
 			log.Printf("Server to contact: %v\n", serverName)
 		} else {
@@ -245,8 +261,16 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 	// Find any alive server
 	serverID := clientData.servers[rand.Intn(nodes)]
-	for serverList[serverID].mode != 1 {
+
+	serverList[serverID].lock.Lock()
+	mode := serverList[serverID].mode
+	serverList[serverID].lock.Unlock()
+
+	for mode != 1 {
 		serverID = clientData.servers[rand.Intn(nodes)]
+		serverList[serverID].lock.Lock()
+		mode = serverList[serverID].mode
+		serverList[serverID].lock.Unlock()
 	}
 	serverToContact := serverList[serverID]
 
@@ -254,13 +278,13 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	// TODO: Use the timeout
 	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	resp, err := serverToContact.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
-	if err == nil {
-		val = resp.GetValue()
-		successCode = resp.GetSuccessCode()
+	// ServerInstance.conn is Read only -- no lock needed for safety
+	resp, err := serverToContact.conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
+	if err != nil {
+		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
 	}
 
-	return &pb.Response{Value: val, SuccessCode: successCode}, nil
+	return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
 }
 
 func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
@@ -277,19 +301,24 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("client ID does not exist")
 	}
 
-	// Contact ALL alive servers and update value,successCode for this key
+	// Contact ALL (alive+zombie) servers and update value,successCode for this key
 	log.Printf("SetValue Received: %v:%v\n", in.GetKey(), in.GetValue())
 
 	// [!] Also generate an ID for this Query
-	// TODO: Handle concurrent queries (Use locks)
+	// COMPLETED: Handle concurrent queries (Use locks)
+	var savedQueryID int64 = 0
+	queryIDMu.Lock()
 	queryID = queryID + 1
+	savedQueryID = queryID
+	queryIDMu.Unlock()
+
 	for _, server := range serverList {
-		if server.mode == 1 {
+		if server.mode != -1 {
 			// Send request to the respective server
 			// TODO: Use the timeout
 			privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			resp, err := server.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: queryID, Key: in.GetKey(), Value: in.GetValue()})
+			resp, err := server.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
 			if err == nil {
 				// TODO: Do something if inconsistent values read from different servers
 				val = resp.GetValue()
@@ -307,8 +336,11 @@ func (lb *loadBalancer) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack,
 	updatedStatus := in.GetNewStatus()
 
 	// Update status in global map
-	serverID := serverNameMap[serverName]
-	serverList[serverID].mode = updatedStatus
+	server := serverList[serverNameMap[serverName]]
+
+	server.lock.Lock()
+	server.mode = updatedStatus
+	server.lock.Unlock()
 
 	return &pb.Ack{}, nil
 }
@@ -320,6 +352,8 @@ func (lb *loadBalancer) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) 
 
 	var aliveList string = ""
 	// Iterate over all servers, and append into a string
+	// Concurrency safety -- execute the block with a lock over the ServerInstance Object
+	serverList[serverID].lock.Lock()
 	for _, peerInstance := range serverList {
 		if peerInstance.mode == 1 {
 			// Server is alive. Check if it is not in blockedPeers
@@ -340,6 +374,7 @@ func (lb *loadBalancer) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) 
 			}
 		}
 	}
+	serverList[serverID].lock.Unlock()
 
 	return &pb.AlivePeersResponse{AliveList: aliveList}, nil
 }
@@ -368,7 +403,7 @@ func main() {
 		}
 		defer conn.Close()
 		c := pb.NewInternalClient(conn)
-		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 1}
+		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 1, lock: sync.Mutex{}}
 		serverList[i] = s
 	}
 

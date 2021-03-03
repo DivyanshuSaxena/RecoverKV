@@ -7,8 +7,9 @@ import (
 	"log"
 	"net"
 	"os"
-	pb "recoverKV/gen/recoverKV"
 	"sync"
+
+	pb "recoverKV/gen/recoverKV"
 
 	"google.golang.org/grpc"
 )
@@ -87,7 +88,6 @@ func PrintStartMsg(port string) {
 	fmt.Println("Server started successfully on port" + port)
 }
 
-// RunServer runs a gRPC server. Function can be called as a go routine
 func main() {
 	fmt.Println("Starting server execution")
 
