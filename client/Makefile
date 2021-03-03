@@ -1,6 +1,6 @@
 LDFLAGS += -L/usr/local/lib `pkg-config --libs protobuf grpc++ grpc`\
            -Wl,--no-as-needed -lgrpc++_reflection -Wl,--as-needed\
-           -ldl
+           -luuid -ldl
 THFLAGS = -pthread
 
 CXX = g++
