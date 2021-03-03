@@ -305,6 +305,7 @@ func main() {
 					// Step 6.
 					server_mode = "ALIVE"
 					// Merge update log table to data table, only if uid > one in the data_table.
+					// if ApplyUpdateLogPureSql{ // This is pure SQL version, check perf difference.
 					if ApplyUpdateLog() {
 						// Any new requests comming in will be made on data_table
 						// load the stored data to table

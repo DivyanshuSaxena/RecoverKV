@@ -249,18 +249,18 @@ func SearchQueryLog(uid int64) string {
 
 /*
 Purely SQL approach: Works only in sqlite though
-
+Approach 1:
 * create table if not exists tmp (key string PRIMARY KEY, value string, uid INT);
 * insert into tmp select key, value, max(uid) 
-* from (select * from store union select * from update_tbl) group by key;
-drop table store;
+from (select * from store union select * from update_tbl) group by key;
+* drop table store;
 * ALTER TABLE tmp RENAME TO store;
 
  Results might not be guranteed due to functional dependency maybe try
  FULL OUTER JOIN, MERGE or INSERT .. ON CONFLICT
 
-
- * With CTEs
+Approach 2:
+ * With CTEs and UNION - This is guranteed to work.
  WITH cte1 AS (
          SELECT * FROM A
           UNION
@@ -275,11 +275,61 @@ SELECT *
  WHERE n = 1
 ;
 */
+func ApplyUpdateLogPureSql() bool{
+	stat, err := db.Prepare("create table if not exists tmp (key string PRIMARY KEY, value string, uid INT);")
+	stat.Exec()
+	if checkErr(err) {
+		log.Println("Error!",err.Error())
+		return false
+	}
+	stat, err = db.Prepare("insert into tmp select key, value, max(uid) from (select * from store union select * from update_log) group by key;")
+	stat.Exec()
+	if checkErr(err) {
+		log.Println("Error!",err.Error())
+		return false
+	}
+	stat, err = db.Prepare("DROP TABLE store")
+	if err!= nil {
+		log.Println("Error: ", err)
+		return false
+	}
+	stat.Exec()
+	stat, err = db.Prepare("ALTER TABLE tmp RENAME TO store;")
+	if err!= nil {
+		log.Println("Error: ", err)
+		return false
+	}
+	stat.Exec()
+
+	return true
+}
 
 // Recovery complete so now apply all Update log
 // Only apply if uid for a key is greater than one existing.
 func ApplyUpdateLog() bool{
+	status := false
 	// read entire update log and row by row 
-	//rows, err := db.Query("SELECT * FROM update_log")
-	return true
+	rows, err := db.Query("SELECT key, value, uid FROM update_log")
+	if checkErr(err) {
+		log.Println("[Recovery] Select ApplyUpdateLog failed")
+		return status
+	}
+	var key string
+	var value string
+	var uid int 
+	for rows.Next() {
+		rows.Scan(&key, &value, &uid)
+		str_row, err := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", key, uid)
+		var tmpkey string
+		row.Scan(&tmpkey)
+		if tmpkey == "" {
+			// This means key doesn't exist or uid is smaller, so now replace/insert from update_log.
+			// Also insert to log.
+			if UpdateKey(qkey, qval, quid, db) {
+				status = true
+			}
+		}
+		// else ignore since the one in store is already latest.
+	}
+	return status
 }
