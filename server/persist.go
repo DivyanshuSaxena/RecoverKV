@@ -13,14 +13,13 @@ import (
 )
 
 var prep_query string
-/*
-* log path changes every time server restarts,
-* so to keep it unique let's use UNIX timestamp.
-*/
-log_path := "./log/"+strconv.Itoa(int(time.Now().Unix()))
-var flog *os.File
-
+var prep_query_log string
+var prep_update_query_log string
 //type MyMap map[string]string
+
+var updateStatement *sql.Stmt
+var updateLogStatement *sql.Smt
+var updateLogTableStatement *sql.Smt
 
 func init() {
 	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -51,7 +50,7 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 
 	_, err = statement.Exec()
 	if checkErr(err) {
-		log.Println("=== TABLE CREATION FAILED:", err.Error())
+		log.Println("=== STORE TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
 	prep_query = "REPLACE INTO store (key, value, uid) VALUES (?, ?, ?)"
@@ -60,13 +59,42 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		log.Println("=== UPDATE QUERY PREPATION FAILED:", err.Error())
 		return nil, false
 	}
-	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
-
-	flog, err := os.OpenFile(log_path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	// Create log table
+	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS log (uid INT PRIMARY KEY, query TEXT)")
+	_, err = statement.Exec()
 	if checkErr(err) {
-		log.Println("=== LOG file creation failed")
+		log.Println("=== LOG TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
+	prep_query_log = "REPLACE INTO log (uid, query) VALUES (?, ?)"
+	updateLogStatement, err = database.Prepare(prep_query_log)
+	if checkErr(err) {
+		log.Println("=== LOG UPDATE QUERY PREPATION FAILED:", err.Error())
+		return nil, false
+	}
+
+	//Create update log table
+	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS update_log (key TEXT PRIMARY KEY, value TEXT, uid INT)")
+	_, err = statement.Exec()
+	if checkErr(err) {
+		log.Println("=== UPDATE LOG TABLE CREATION FAILED:", err.Error())
+		return nil, false
+	}
+	// Clear update log table if failed during another recovery
+	statement, _ = database.Prepare("DELETE FROM update_log")
+	_, err = statement.Exec()
+	if checkErr(err) {
+		log.Println("=== UPDATE LOG TABLE TRUNCATE FAILED:", err.Error())
+		return nil, false
+	}
+
+	prep_update_query_log = "REPLACE INTO update_log (key, value, uid) VALUES (?, ?, ?)"
+	updateLogTableStatement, err = database.Prepare(prep_update_query_log)
+	if checkErr(err) {
+		log.Println("=== UPDATE LOG TABLE REPLACE QUERY PREPATION FAILED:", err.Error())
+		return nil, false
+	}
+	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
 	return database, true
 }
 
@@ -74,25 +102,37 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 // It also stores the uid of last query that modified it.
 func UpdateKey(key string, value string, int64 uid, database *sql.DB) bool {
 
-	_, err := updateStatement.Exec(key, value, uid)
-
-	if checkErr(err) {
-		log.Println("=== KEY UPDATE FAILED:", err.Error())
-		return false
-	}
-
 	// Prepare query for log file
-    cur_query := strings.Replace(prep_query, "?", fmt.Sprintf("'%v'", val1), 1)
-    cur_query = strings.Replace(cur_query, "?", fmt.Sprintf("'%v'", val2), 1)
-    cur_query = strings.Replace(cur_query, "?", strconv.FormatInt(val3, 10), 1)
-	
-	// TODO: Make this a routine? Might affect correctness.
-	if !logQuery(cur_query) {
-		log.Println("=== LOG UPDATE FAILED for Key", key)
-		return false
-	}
+	cur_query := strings.Replace(prep_query, "?", fmt.Sprintf("'%v'", val1), 1)
+	cur_query = strings.Replace(cur_query, "?", fmt.Sprintf("'%v'", val2), 1)
+	cur_query = strings.Replace(cur_query, "?", strconv.FormatInt(val3, 10), 1)
 
-	return true
+	if server_mode == "ALIVE" {
+		_, err := updateStatement.Exec(key, value, uid)
+
+		if checkErr(err) {
+			log.Println("=== KEY UPDATE FAILED:", err.Error())
+			return false
+		}
+		
+		// Update log table now
+		_, err = updateLogStatement.Exec(uid, cur_query)
+		if checkErr(err) {
+			log.Println("=== LOG UPDATE FAILED:", err.Error())
+			return false
+		}
+	
+		return true
+	} else {
+		// In Zombie mode. So send all updates to update_log 
+		// table and don't write it to store or log.
+		_,err := updateLogTableStatement.Exec(key, value, uid)
+		if checkErr(err) {
+			log.Println("=== REPLACE ON UPDATE LOG TABLE FAILED:", err.Error())
+			return false
+		}
+		return true
+	} 
 }
 
 // GetValue returns value for `key` in the DB
@@ -143,6 +183,7 @@ func checkErr(err error) bool {
 
 // Return the last UID
 func FetchLocalUID(path string) int64 {
+	// Not from log or update_log
     st,err := database.QueryRow("SELECT MAX(uid) FROM store")
 	if err != nil {
 		log.Println)"[Recovery] failed during query FetchLocalUID"
@@ -150,14 +191,6 @@ func FetchLocalUID(path string) int64 {
     var luid string
     st.Scan(&luid)
     return int64(luid)
-}
-
-// Logs query to a log file. Each query will be on a single line.
-func logQuery(query string) bool {
-	if _, err = flog.WriteString(query+"\n"); err != nil {
-		return false
-  }
-  return true
 }
 
 // Apply a given query if it's latest for the key.
@@ -172,7 +205,11 @@ func ApplyQuery(query string) bool {
 	qkey := re.ReplaceAllString(tmp[len(tmp)-3],"")
 	
 	// check with db and see if quid is larger,
-	row := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", qkey, quid)
+	row, err := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", qkey, quid)
+	if checkErr(err) {
+		log.Println("[Recovery] Select query on STORE failed == ApplyQuery")
+		return false
+	}
 	var tmpkey string
 	row.Scan(&tmpkey)
 	if tmpkey == "" {
@@ -192,62 +229,57 @@ func ApplyQuery(query string) bool {
 	//TODO: Add logs to this function
 }
 
-// Searches uid for a given file and returns that line
-func searchFile(uid int64, filepath string) string{
-	var squery string
-	f, err := os.Open(filepath)
-	if err != nil {
-		log.Println("[Recovery] Failed to open file during searchFile"+filepath+":"+err)
+// Searched entire log table for uid and returns query
+func SearchQueryLog(uid int64) string {
+	
+	row := db.QueryRow("SELECT query FROM log WHERE uid=?", uid)
+
+	if checkErr(err) {
+		log.Println("[Recovery] Select query on LOG failed == SearchQueryLog")
 		return ""
 	}
-	defer f.Close()
-
-	// Splits on newlines by default.
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), strconv.Itoa(uid)) {
-			squery = scanner.Text()
-			break
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		// Handle the error
-		log.Println("[Recovery] Error in scanner searchFile"+filepath+":"+err)
-		return ""
+	var tmpQuery string
+	row.Scan(&tmpQuery)
+	if tmpQuery != "" {
+		return tmpQuery
 	}
 	return ""
 }
 
 
-// Searches the entire log file for uid and returns that line.
-// How many log files should this search, in what order
-func SearchQueryLog(uid int64) string{
-	// It'll begin by searching the current log.
-	dir := "./log/"
-	files, err := ioutil.ReadDir(dir)
-	// A list of recently modified files in log dir
-	sort.Slice(files, func(i,j int) bool{
-		return files[i].ModTime().Unix() < files[j].ModTime().Unix()
-	})
-	// Now iterate over each and check for uid
-	for _, file := range files {
-		filepath := "./log/"+file.Name()
-		query = searchFile(filepath)
-		if query != "" {
-			return query
-			break
-		}
-	}
-	return ""
-	/**
-	* ADDON: Multiple threads can divide the recency file list and 
-	*		search in parallel to find the uid soon.
-	*/
+/*
+Purely SQL approach: Works only in sqlite though
+
+* create table if not exists tmp (key string PRIMARY KEY, value string, uid INT);
+* insert into tmp select key, value, max(uid) 
+* from (select * from store union select * from update_tbl) group by key;
+drop table store;
+* ALTER TABLE tmp RENAME TO store;
+
+ Results might not be guranteed due to functional dependency maybe try
+ FULL OUTER JOIN, MERGE or INSERT .. ON CONFLICT
+
+
+ * With CTEs
+ WITH cte1 AS (
+         SELECT * FROM A
+          UNION
+         SELECT * FROM B
+     )
+   , cte2 AS (
+         SELECT t.*, ROW_NUMBER() OVER (PARTITION BY key ORDER BY uid DESC) AS n
+           FROM cte1 AS t
+     )
+SELECT *
+  FROM cte2
+ WHERE n = 1
+;
+*/
+
+// Recovery complete so now apply all Update log
+// Only apply if uid for a key is greater than one existing.
+func ApplyUpdateLog() bool{
+	// read entire update log and row by row 
+	//rows, err := db.Query("SELECT * FROM update_log")
+	return true
 }
-
-
-
-// All data is written twice, so compaction is important.
-// TODO: One fine day
-func compactLogs(path string) bool
