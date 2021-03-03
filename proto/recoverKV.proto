@@ -90,8 +90,9 @@ message InternalRequest {
 
 // The response message containing response
 message InternalResponse {
-    string value = 1;
-    int32 successCode = 2;
+    int64 queryID = 1;
+    string value = 2;
+    int32 successCode = 3;
 }
 
 message MarkStatus {
@@ -107,7 +108,9 @@ message AlivePeersResponse {
     string aliveList = 1;
 }
 
-message Ack {}
+message Ack {
+    int64 globalUID = 1;
+}
 
 // For recovery:
 // qLength  is number of queries needed by caller

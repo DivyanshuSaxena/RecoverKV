@@ -242,7 +242,6 @@ func (lb *loadBalancer) FreeLBState(ctx context.Context, in *pb.StateRequest) (*
 
 func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 
-	var successCode int32 = 0
 	var val string = ""
 
 	clientID := in.GetClientID()
@@ -259,32 +258,48 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	key := in.GetKey()
 	log.Printf("GetValue Received: %v\n", key)
 
-	// Find any alive server
-	serverID := clientData.servers[rand.Intn(nodes)]
+	maxTries := 10
+	// In case a server times out, retry connection for maximum maxTries
+	for i := 0; i < maxTries; i++ {
+		// Find any alive server
+		serverID := clientData.servers[rand.Intn(nodes)]
 
-	serverList[serverID].lock.Lock()
-	mode := serverList[serverID].mode
-	serverList[serverID].lock.Unlock()
-
-	for mode != 1 {
-		serverID = clientData.servers[rand.Intn(nodes)]
 		serverList[serverID].lock.Lock()
-		mode = serverList[serverID].mode
+		mode := serverList[serverID].mode
 		serverList[serverID].lock.Unlock()
-	}
-	serverToContact := serverList[serverID]
 
-	// Send request to the respective server
-	// TODO: Use the timeout
-	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-	// ServerInstance.conn is Read only -- no lock needed for safety
-	resp, err := serverToContact.conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
-	if err != nil {
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
+		for mode != 1 {
+			serverID = clientData.servers[rand.Intn(nodes)]
+			serverList[serverID].lock.Lock()
+			mode = serverList[serverID].mode
+			serverList[serverID].lock.Unlock()
+		}
+		serverToContact := serverList[serverID]
+
+		// Send request to the respective server
+		// COMPLETED: Use the timeout
+		privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		// If timed out, mark node as DEAD
+		if privateCtx.Err() == context.Canceled {
+			log.Printf("Timeout while contacting server %v\n", serverToContact.name)
+
+			serverToContact.lock.Lock()
+			serverToContact.mode = -1
+			serverToContact.lock.Unlock()
+			i = i + 1
+		} else {
+			// ServerInstance.conn is Read only -- no lock needed for safety
+			resp, err := serverList[serverID].conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
+			if err != nil {
+				return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
+			}
+			return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
+		}
 	}
 
-	return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
+	// No successful connection could be made
+	return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
 }
 
 func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
@@ -312,26 +327,51 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	savedQueryID = queryID
 	queryIDMu.Unlock()
 
+	// Resolve conflicting return values
+	var latestUID int64 = 0
+	// Count number of successful writes
+	successfulPuts := 0
+
 	for _, server := range serverList {
 		if server.mode != -1 {
 			// Send request to the respective server
-			// TODO: Use the timeout
+			// COMPLETED: Use the timeout
 			privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
+			// If timed out, mark node as DEAD
+			if privateCtx.Err() == context.Canceled {
+				log.Printf("Timeout while contacting server %v\n", server.name)
+
+				server.lock.Lock()
+				server.mode = -1
+				server.lock.Unlock()
+				continue
+			}
+
+			// If connection did not time out, proceed with the request
 			resp, err := server.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
 			if err == nil {
-				// TODO: Do something if inconsistent values read from different servers
-				val = resp.GetValue()
-				successCode = resp.GetSuccessCode()
+				// COMPLETED: Do something if inconsistent values read from different servers
+				successfulPuts = successfulPuts + 1
+				uid := resp.GetQueryID()
+				if uid > latestUID {
+					val = resp.GetValue()
+					successCode = resp.GetSuccessCode()
+				}
 			}
 		}
 	}
 
-	return &pb.Response{Value: val, SuccessCode: successCode}, nil
+	if successfulPuts > 1 {
+		return &pb.Response{Value: val, SuccessCode: successCode}, nil
+	}
+
+	// No successful put could be made
+	return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
 }
 
 func (lb *loadBalancer) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack, error) {
-	// TODO: Any corner cases (or error handling) required here?
+	// COMPLETED: Any corner cases (or error handling) required here?
 	serverName := in.GetServerName()
 	updatedStatus := in.GetNewStatus()
 
@@ -342,11 +382,16 @@ func (lb *loadBalancer) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack,
 	server.mode = updatedStatus
 	server.lock.Unlock()
 
-	return &pb.Ack{}, nil
+	// Send the current max global ID back to the server
+	queryIDMu.Lock()
+	globalUID := queryID
+	queryIDMu.Unlock()
+
+	return &pb.Ack{GlobalUID: globalUID}, nil
 }
 
 func (lb *loadBalancer) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) (*pb.AlivePeersResponse, error) {
-	// TODO: Any corner cases (or error handling) required here?
+	// COMPLETED: Any corner cases (or error handling) required here?
 	serverName := in.GetServerName()
 	serverID := serverNameMap[serverName]
 
@@ -382,7 +427,7 @@ func (lb *loadBalancer) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) 
 func main() {
 
 	////////////////////////////////////////////////////
-	//TODO: Establish connection with all nodes and store a global mapping
+	// COMPLETED: Establish connection with all nodes and store a global mapping
 	// of name <host:port> <-> client object. We should also store a bit
 	// if they are alive or dead (dead being categorized by timeout or fail-stop)
 	// This makes sure we always make three conn (independent of number of client joining)
