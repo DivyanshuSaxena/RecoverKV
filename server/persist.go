@@ -2,19 +2,21 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
 
-	_ "github.com/mattn/go-sqlite3"
-	"strings"
-    "strconv"
 	"regexp"
-	"bufio"
+	"strconv"
+	"strings"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var prep_query string
 var prep_query_log string
 var prep_update_query_log string
+
 //type MyMap map[string]string
 
 var updateStatement *sql.Stmt
@@ -114,25 +116,25 @@ func UpdateKey(key string, value string, int64 uid, database *sql.DB) bool {
 			log.Println("=== KEY UPDATE FAILED:", err.Error())
 			return false
 		}
-		
+
 		// Update log table now
 		_, err = updateLogStatement.Exec(uid, cur_query)
 		if checkErr(err) {
 			log.Println("=== LOG UPDATE FAILED:", err.Error())
 			return false
 		}
-	
+
 		return true
 	} else {
-		// In Zombie mode. So send all updates to update_log 
+		// In Zombie mode. So send all updates to update_log
 		// table and don't write it to store or log.
-		_,err := updateLogTableStatement.Exec(key, value, uid)
+		_, err := updateLogTableStatement.Exec(key, value, uid)
 		if checkErr(err) {
 			log.Println("=== REPLACE ON UPDATE LOG TABLE FAILED:", err.Error())
 			return false
 		}
 		return true
-	} 
+	}
 }
 
 // GetValue returns value for `key` in the DB
@@ -184,13 +186,13 @@ func checkErr(err error) bool {
 // Return the last UID
 func FetchLocalUID(path string) int64 {
 	// Not from log or update_log
-    st,err := database.QueryRow("SELECT MAX(uid) FROM store")
+	st, err := database.QueryRow("SELECT MAX(uid) FROM store")
 	if err != nil {
-		log.Println)"[Recovery] failed during query FetchLocalUID"
+		log.Println("[Recovery] failed during query FetchLocalUID")
 	}
-    var luid string
-    st.Scan(&luid)
-    return int64(luid)
+	var luid string
+	st.Scan(&luid)
+	return int64(luid)
 }
 
 // Apply a given query if it's latest for the key.
@@ -200,10 +202,10 @@ func ApplyQuery(query string) bool {
 	tmp := strings.SplitN(query, " ", -1)
 	// Get last element and remove '(),' from it.
 	var re = regexp.MustCompile(`(^\(|\)|,)`)
-    quid := int64(re.ReplaceAllString(tmp[len(tmp)-1],""))
-	qval := re.ReplaceAllString(tmp[len(tmp)-2],"")
-	qkey := re.ReplaceAllString(tmp[len(tmp)-3],"")
-	
+	quid := int64(re.ReplaceAllString(tmp[len(tmp)-1], ""))
+	qval := re.ReplaceAllString(tmp[len(tmp)-2], "")
+	qkey := re.ReplaceAllString(tmp[len(tmp)-3], "")
+
 	// check with db and see if quid is larger,
 	row, err := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", qkey, quid)
 	if checkErr(err) {
@@ -231,8 +233,8 @@ func ApplyQuery(query string) bool {
 
 // Searched entire log table for uid and returns query
 func SearchQueryLog(uid int64) string {
-	
-	row := db.QueryRow("SELECT query FROM log WHERE uid=?", uid)
+
+	row, err := db.QueryRow("SELECT query FROM log WHERE uid=?", uid)
 
 	if checkErr(err) {
 		log.Println("[Recovery] Select query on LOG failed == SearchQueryLog")
@@ -246,12 +248,11 @@ func SearchQueryLog(uid int64) string {
 	return ""
 }
 
-
 /*
 Purely SQL approach: Works only in sqlite though
 Approach 1:
 * create table if not exists tmp (key string PRIMARY KEY, value string, uid INT);
-* insert into tmp select key, value, max(uid) 
+* insert into tmp select key, value, max(uid)
 from (select * from store union select * from update_tbl) group by key;
 * drop table store;
 * ALTER TABLE tmp RENAME TO store;
@@ -275,27 +276,27 @@ SELECT *
  WHERE n = 1
 ;
 */
-func ApplyUpdateLogPureSql() bool{
+func ApplyUpdateLogPureSql() bool {
 	stat, err := db.Prepare("create table if not exists tmp (key string PRIMARY KEY, value string, uid INT);")
 	stat.Exec()
 	if checkErr(err) {
-		log.Println("Error!",err.Error())
+		log.Println("Error!", err.Error())
 		return false
 	}
 	stat, err = db.Prepare("insert into tmp select key, value, max(uid) from (select * from store union select * from update_log) group by key;")
 	stat.Exec()
 	if checkErr(err) {
-		log.Println("Error!",err.Error())
+		log.Println("Error!", err.Error())
 		return false
 	}
 	stat, err = db.Prepare("DROP TABLE store")
-	if err!= nil {
+	if err != nil {
 		log.Println("Error: ", err)
 		return false
 	}
 	stat.Exec()
 	stat, err = db.Prepare("ALTER TABLE tmp RENAME TO store;")
-	if err!= nil {
+	if err != nil {
 		log.Println("Error: ", err)
 		return false
 	}
@@ -306,9 +307,9 @@ func ApplyUpdateLogPureSql() bool{
 
 // Recovery complete so now apply all Update log
 // Only apply if uid for a key is greater than one existing.
-func ApplyUpdateLog() bool{
+func ApplyUpdateLog() bool {
 	status := false
-	// read entire update log and row by row 
+	// read entire update log and row by row
 	rows, err := db.Query("SELECT key, value, uid FROM update_log")
 	if checkErr(err) {
 		log.Println("[Recovery] Select ApplyUpdateLog failed")
@@ -316,7 +317,7 @@ func ApplyUpdateLog() bool{
 	}
 	var key string
 	var value string
-	var uid int 
+	var uid int
 	for rows.Next() {
 		rows.Scan(&key, &value, &uid)
 		str_row, err := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", key, uid)
@@ -332,4 +333,43 @@ func ApplyUpdateLog() bool{
 		// else ignore since the one in store is already latest.
 	}
 	return status
+}
+
+// TODO: Check the holes-finding-SQL query here
+func GetHolesInLogTable() string {
+	query := `
+	SELECT a AS id, b AS next_id FROM (
+		SELECT a1.uid AS a , MIN(a2.uid) AS b
+		FROM store AS a1 LEFT JOIN store AS a2
+			ON a2.uid > a1.uid
+		GROUP BY a1.uid) AS tab
+	WHERE b > a + 1`
+	rows, err := db.Query(query)
+	if checkErr(err) {
+		log.Println("[Recovery] Finding gas in log table failed")
+		return status
+	}
+
+	ret_str := ""
+	var least_prs_id string
+	var max_prs_id string
+	for rows.Next() {
+		rows.Scan(&least_prs_id, &max_prs_id)
+		if ret_str == "" {
+			ret_str += (least_prs_id + "-" + max_prs_id)
+		} else {
+			ret_str += ("|" + least_prs_id + "-" + max_prs_id)
+		}
+	}
+	return ret_str
+}
+
+// TODO: Check the peer-find-relevant-qids query here
+func GetMissingQueriesForPeer(start string, end string) *Rows {
+	rows, err := db.QueryRow("SELECT query FROM log WHERE uid>? AND uid<?", start, end)
+	if checkErr(err) {
+		log.Println("[Recovery] Finding gas in log table failed")
+		return nil
+	}
+	return rows
 }

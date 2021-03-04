@@ -67,9 +67,8 @@ service StreamService {
 // qLenght  is number of queries needed by caller
 // fromId   is the last global uid as of last request from caller
 message RecRequest {
-    int32 qLength = 1;
-    int64 fromId = 2;
-    string address = 3;
+  string missingUIDs = 1;
+  string address = 2;
 }
 
 // query is the string of query with value.
