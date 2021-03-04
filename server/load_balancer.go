@@ -367,7 +367,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	}
 
 	// No successful put could be made
-	return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
+	return &pb.Response{Value: "", SuccessCode: -2}, errors.New("operation failed")
 }
 
 func (lb *loadBalancer) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack, error) {
