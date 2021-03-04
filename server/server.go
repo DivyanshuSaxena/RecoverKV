@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"time"
 	"net"
 	"os"
 	"sync"
 	"math/rand"
 
 	pb "recoverKV/gen/recoverKV"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	"google.golang.org/grpc"
 	"strconv"
@@ -90,6 +92,26 @@ func (s *server) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, er
 	// TODO: check if bellow true of false before returning.
 	UpdateKey(key, newVal, uid, db)
 	return &pb.Response{Value: val, SuccessCode: successCode}, nil
+}
+
+func (s *server) stopServer(ctx context.Context, in *emptypb.Empty) (*pb.Response, error) {
+
+	go func (){
+		// wait for 3 seconds
+		time.Sleep(3)
+		// then exit the parent process
+		os.Exit(0)
+	}()
+
+	return &pb.Response{Value: "", SuccessCode: 0}, nil
+}
+
+func (s *server) partitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
+
+	// On partition healing fetch data that is not there.
+	// We only talk to reachable Alive servers
+	go recoveryStage(FetchLocalUID())
+	return &pb.Response{Value: "", SuccessCode: 0}, nil
 }
 
 // PrintStartMsg prints the start message for the server
