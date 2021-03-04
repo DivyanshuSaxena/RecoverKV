@@ -7,7 +7,7 @@ int RecoverKVClient::getValue(char *client_id, char *key, char *value)
     Response response;
     ClientContext context;
 
-    request.set_objectid(client_id);
+    request.set_clientid(client_id);
     request.set_key(key);
     request.set_value("");
 
@@ -42,7 +42,7 @@ int RecoverKVClient::setValue(char *client_id, char *key, char *value, char *old
     Response response;
     ClientContext context;
 
-    request.set_objectid(client_id);
+    request.set_clientid(client_id);
     request.set_key(key);
     request.set_value(value);
 
@@ -77,7 +77,7 @@ int RecoverKVClient::initLBState(char *client_id, string servers_list)
     Response response;
     ClientContext context;
 
-    request.set_objectid(client_id);
+    request.set_clientid(client_id);
     request.set_serverslist(servers_list);
 
     Status status = stub_->initLBState(&context, request, &response);
@@ -99,7 +99,7 @@ int RecoverKVClient::freeLBState(char *client_id)
     Response response;
     ClientContext context;
 
-    request.set_objectid(client_id);
+    request.set_clientid(client_id);
     request.set_serverslist("");
 
     Status status = stub_->freeLBState(&context, request, &response);
@@ -122,7 +122,7 @@ int RecoverKVClient::stopServer(char *client_id, char *server_name, int clean)
     Response response;
     ClientContext context;
 
-    request.set_objectid(client_id);
+    request.set_clientid(client_id);
     request.set_servername(server_name);
     request.set_cleantype(clean);
 
@@ -146,7 +146,7 @@ int RecoverKVClient::partitionServer(char *client_id, char *server_name, string 
     Response response;
     ClientContext context;
 
-    request.set_objectid(client_id);
+    request.set_clientid(client_id);
     request.set_servername(server_name);
     request.set_reachable(reachable_list);
 
@@ -172,19 +172,9 @@ KV739Client::KV739Client()
     // Hardcode load balancer address
     lb_addr = "localhost:50050";
 
-    try
-    {
-
-        client = new RecoverKVClient(
+    // grpc handler
+    client = new RecoverKVClient(
             grpc::CreateChannel(lb_addr, grpc::InsecureChannelCredentials()));
-
-    }
-    catch (exception &e)
-    {
-
-        client = NULL;
-        cout << "[ERROR]" << e.what() << '\n';
-    }
 }
 
 // Destructor for clean up
@@ -241,13 +231,14 @@ int KV739Client::kv739_init(char **server_names)
 
     // Generate a unique user id
     uuid_generate_time_safe(id);
-    uuid_unparse_lower(id, client_id);
+    client_id = new char[128];
+    uuid_unparse(id, client_id);
 
     // Send server names to load balancer
     if (client->initLBState(client_id, servers_list) == -1)
     {
         cout << "[ERROR]"
-             << "Could not establish connection with server instances" << endl;
+             << "Could not establish connection with server instances or lb" << endl;
         return -1;
     }
 

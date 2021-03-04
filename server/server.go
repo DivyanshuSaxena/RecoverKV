@@ -7,9 +7,11 @@ import (
 	"log"
 	"net"
 	"os"
-	pb "recoverKV/gen/recoverKV"
 	"sync"
 	"math/rand"
+
+	pb "recoverKV/gen/recoverKV"
+
 	"google.golang.org/grpc"
 	"strconv"
 )
