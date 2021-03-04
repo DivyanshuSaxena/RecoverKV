@@ -16,6 +16,7 @@ import (
 
 	"google.golang.org/grpc"
 	"strconv"
+	"strings"
 )
 
 var ip_addr string
@@ -106,14 +107,6 @@ func (s *server) stopServer(ctx context.Context, in *emptypb.Empty) (*pb.Respons
 	return &pb.Response{Value: "", SuccessCode: 0}, nil
 }
 
-func (s *server) partitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
-
-	// On partition healing fetch data that is not there.
-	// We only talk to reachable Alive servers
-	go recoveryStage(FetchLocalUID())
-	return &pb.Response{Value: "", SuccessCode: 0}, nil
-}
-
 // PrintStartMsg prints the start message for the server
 func PrintStartMsg() {
 	name := `
@@ -131,11 +124,33 @@ func PrintStartMsg() {
 }
 
 // Recovery request handler 
-func (s server) FetchQueries(in *pb.Request, srv pb.StreamService_FetchResponseServer) error {
-	fmt.Println("[Recovery] Responding to server "+in.Address)
-	log.Println("[Recovery] Responding to server "+in.Address)
+func (s server) FetchQueries(in *pb.RecRequest, srv pb.StreamService_FetchResponseServer) error {
+	fmt.Println("[Recovery] Responding to server "+in.GetAddress())
+	log.Println("[Recovery] Responding to server "+in.GetAddress())
 
 	ferr := 0
+	// Parse the received missing UIDs from the recovering node
+	missingList := strings.Split(in.GetMissingUIDs(), "|")
+	for _, missingRange := range missingList {
+		// Extract the individual ranges
+		rangeBound := strings.Split(in.GetMissingUIDs(), "-")
+		// Can send multiple queries to the db here. But rather sending a single one.
+		rows := GetMissingQueriesForPeer(rangeBound[0], rangeBound[1])
+		var tmpQuery string
+		for rows.Next() {
+			rows.Scan(&tmpQuery)
+			if tmpQuery == "" {
+				ferr = 1
+			}
+			resp := pb.RecResponse{Query: tmpQuery, FoundError: ferr}
+			if err := srv.Send(&resp); err != nil {
+				log.Printf("[Recovery] Send error %v", err)
+			}
+		}
+	}
+
+	///////////////////////////////////////////////////////////////////////////
+	// TODO: Remove this entire block, once confirmed that it isn't needed
 	// From the given id search for it in the log table.
 	// ADDON: This could be further improved by having multiple threads divide the search requests
 	// 		 by each invoking searchQueryLog and respond back as and when they find the query. 
@@ -158,10 +173,16 @@ func (s server) FetchQueries(in *pb.Request, srv pb.StreamService_FetchResponseS
 			log.Printf("[Recovery] Send error %v", err)
 		}
 	}
+	///////////////////////////////////////////////////////////////////////////
+
+
 	return nil
 }
 
 func rpcRequestLogs(peer_addr string, count int, from int) bool{
+	// send query to DB
+	str := GetHolesInLogTable()
+
 	// dial peer
 	conn, err := grpc.Dial(peer_addr, grpc.WithInsecure())
 	if err != nil {
@@ -171,7 +192,7 @@ func rpcRequestLogs(peer_addr string, count int, from int) bool{
 
 	// creating stream
 	client := pb.NewStreamServiceClient(conn)
-	in := &pb.RecRequest{QLength: count, FromId: from, Address: peer_addr}
+	in := &pb.RecRequest{MissingUIDs: str, Address: peer_addr}
 	stream, err := client.FetchQueries(context.Background(), in)
 	if err != nil {
 		log.Fatalf("[Recovery] Open stream error for peer %v : %v", peer_addr, err)
