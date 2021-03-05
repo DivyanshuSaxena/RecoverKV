@@ -329,26 +329,26 @@ func recoveryStage() {
 	}
 }
 
-// Takes 6 arguments
-// unique id of the server. ip address, serve port, recovery port, LB ip addr, LB port
+// Takes 5 arguments
+// ip address, serve port, recovery port, LB ip addr, LB port
 func main() {
 	//fmt.Println("Starting server execution")
 	server_mode = "DEAD"
 	rand.Seed(time.Now().Unix())
 	//parse arguments -- Not checking, pray user passed correctly!
-	server_id = os.Args[1]
-	ip_addr = os.Args[2]
-	serv_port = os.Args[3]
-	rec_port = os.Args[4]
+	// server_id = os.Args[1]  // Not needed as the load balancer has its own server ids
+	ip_addr = os.Args[1]
+	serv_port = os.Args[2]
+	rec_port = os.Args[3]
 	ip_serv_port := ip_addr + ":" + serv_port
 	ip_rec_port := ip_addr + ":" + rec_port
-	lb_ip_addr = os.Args[5]
-	lb_port = os.Args[6]
+	lb_ip_addr = os.Args[4]
+	lb_port = os.Args[5]
 	ip_lb_port := lb_ip_addr + ":" + lb_port
 
 	db_path = "/tmp/" + serv_port
 	// If the file doesn't exist, create it or append to the file
-	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile("server"+serv_port+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}

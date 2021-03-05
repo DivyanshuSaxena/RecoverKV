@@ -213,7 +213,7 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
         return 0;
     }
     // Ideally, we should not have to wait for any command
-    sleep(5);
+    sleep(10);
 
     // send read request to server
     for (int i = 0; i < total_requests; i++)
@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
     int tests_passed = 0;
 
     // sanity check for writes and reads
-    tests_passed += test_correctness_single_write_and_read(client, 1000);
+    // tests_passed += test_correctness_single_write_and_read(client, 1000);
     cout << "-----------------------------------------" << endl;
 
     // multiple overallaping writes followed by reads
@@ -381,7 +381,7 @@ int main(int argc, char *argv[])
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability
-    // tests_passed += test_correctness_durability(client, serverNames[0], 1000);
+    tests_passed += test_correctness_durability(client, serverNames[0], 10);
     cout << "-----------------------------------------" << endl;
 
     // check for non-existent keys

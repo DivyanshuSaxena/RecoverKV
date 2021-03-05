@@ -6,6 +6,8 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -28,9 +30,9 @@ import (
 				recover ZOMBIE servers.
 
 Load balancer must maintain
----------------------------------------------------------------------------------
+---------------------------------------------------------------------
 ID 		|ip_addr 		|serv_port		|rec_port 		| mode 		| peer_list	|
----------------------------------------------------------------------------------
+---------------------------------------------------------------------
 peer_list = initially everyone but this can change as client requests.
 */
 
@@ -103,6 +105,34 @@ func CanContactServer(clientID string, serverName string) int {
 	}
 
 	return found
+}
+
+// StartServer startes the server with serverId given
+func StartServer(serverID int) {
+	server := serverList[serverID]
+	tmpList := strings.Split(server.name, ":")
+	ipAddr := tmpList[0]
+	servPort := tmpList[1]
+	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort, "localhost", port[1:], "0")
+	cmd.Stdout = os.Stdout
+	log.Println("Started dead server")
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Opening new connection")
+	// Update connection
+	conn, err := grpc.Dial(serverList[serverID].name, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("did not connect: %v\n", err)
+	}
+	defer conn.Close()
+	c := pb.NewInternalClient(conn)
+	serverList[serverID].conn = c
+
+	// Update mode to ZOMBIE
+	serverList[serverID].mode = 0
 }
 
 func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
@@ -210,6 +240,8 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 		serverList[serverID].lock.Lock()
 		serverList[serverID].mode = -1
 		serverList[serverID].lock.Unlock()
+
+		StartServer(serverID)
 	}
 
 	// Server Successfully shutdown
@@ -328,6 +360,8 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 				serverToContact.lock.Lock()
 				serverToContact.mode = -1
 				serverToContact.lock.Unlock()
+
+				StartServer(serverID)
 			}
 			// TODO: Restart the server by executing a shell script
 			continue
@@ -367,7 +401,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	// Count number of successful writes
 	successfulPuts := 0
 
-	for _, server := range serverList {
+	for serverID, server := range serverList {
 		if server.mode != -1 {
 			// Send request to the respective server
 			privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -385,6 +419,8 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 					server.lock.Lock()
 					server.mode = -1
 					server.lock.Unlock()
+
+					StartServer(serverID)
 				}
 				// TODO: Restart the server by executing a shell script
 			} else {
@@ -402,6 +438,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		}
 	}
 
+	log.Printf("SetValue successful puts: %v\n", successfulPuts)
 	if successfulPuts > 0 {
 		return &pb.Response{Value: val, SuccessCode: successCode}, nil
 	}
@@ -477,6 +514,7 @@ func main() {
 	for i := 0; i < nodes; i++ {
 		// TODO: Should we run servers as entirely different processes?
 		name := "localhost" + address[i]
+		log.Printf("Server name: %v\n", name)
 
 		// Save into global data structures
 		serverNameMap[name] = i
@@ -488,6 +526,7 @@ func main() {
 		}
 		defer conn.Close()
 		c := pb.NewInternalClient(conn)
+		log.Printf("Added server id %v\n", i)
 		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 1, lock: sync.Mutex{}}
 		serverList[i] = s
 	}
