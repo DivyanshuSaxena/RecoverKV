@@ -130,12 +130,33 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 		blockedPeers = append(blockedPeers, serverNameMap[reachableName])
 	}
 
-	//If yes, update its local membership clientMap, no need to contact server
+	//If yes, Contact server (so that it can heal, if needed) and update its local membership clientMap
 	server := serverList[serverNameMap[serverName]]
 
 	server.lock.Lock()
+	prevBlockedPeers := server.blockedPeers
 	server.blockedPeers = blockedPeers
 	server.lock.Unlock()
+
+	// Server can heal from only those it is now reachable from
+	if len(reachableList) > 0 {
+
+		serverID := serverNameMap[serverName]
+
+		privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		emptyMsg := new(emptypb.Empty)
+		_, err := serverList[serverID].conn.PartitionServer(privateCtx, emptyMsg)
+		// check it it exists, if not successCode = -1
+		if err != nil || privateCtx.Err() == context.DeadlineExceeded {
+			// Revert back to old blocked peers
+			server.lock.Lock()
+			server.blockedPeers = prevBlockedPeers
+			server.lock.Unlock()
+			return &pb.Response{Value: "", SuccessCode: -1}, errors.New("server cannot be partitioned")
+		}
+
+	}
 
 	// Server Successfully Partitioned
 	return &pb.Response{Value: "", SuccessCode: successCode}, nil

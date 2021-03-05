@@ -45,6 +45,9 @@ service Internal {
 
     // Function for stopping server
     rpc stopServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+    // Function for partition consistency
+    rpc partitionServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
 
 // The request message containing key

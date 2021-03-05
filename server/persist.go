@@ -15,13 +15,11 @@ import (
 
 var prep_query string
 var prep_query_log string
-var prep_update_query_log string
 
 //type MyMap map[string]string
 
 var updateStatement *sql.Stmt
 var updateLogStatement *sql.Smt
-var updateLogTableStatement *sql.Smt
 
 func init() {
 	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -75,27 +73,6 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		return nil, false
 	}
 
-	//Create update log table
-	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS update_log (key TEXT PRIMARY KEY, value TEXT, uid INT)")
-	_, err = statement.Exec()
-	if checkErr(err) {
-		log.Println("=== UPDATE LOG TABLE CREATION FAILED:", err.Error())
-		return nil, false
-	}
-	// Clear update log table if failed during another recovery
-	statement, _ = database.Prepare("DELETE FROM update_log")
-	_, err = statement.Exec()
-	if checkErr(err) {
-		log.Println("=== UPDATE LOG TABLE TRUNCATE FAILED:", err.Error())
-		return nil, false
-	}
-
-	prep_update_query_log = "REPLACE INTO update_log (key, value, uid) VALUES (?, ?, ?)"
-	updateLogTableStatement, err = database.Prepare(prep_update_query_log)
-	if checkErr(err) {
-		log.Println("=== UPDATE LOG TABLE REPLACE QUERY PREPATION FAILED:", err.Error())
-		return nil, false
-	}
 	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
 	return database, true
 }
@@ -183,18 +160,6 @@ func checkErr(err error) bool {
 	return false
 }
 
-// Return the last UID
-func FetchLocalUID(path string) int64 {
-	// Not from log or update_log
-	st, err := database.QueryRow("SELECT MAX(uid) FROM store")
-	if err != nil {
-		log.Println("[Recovery] failed during query FetchLocalUID")
-	}
-	var luid string
-	st.Scan(&luid)
-	return int64(luid)
-}
-
 // Apply a given query if it's latest for the key.
 // return false only if failed applying.
 func ApplyQuery(query string) bool {
@@ -231,110 +196,6 @@ func ApplyQuery(query string) bool {
 	//TODO: Add logs to this function
 }
 
-// Searched entire log table for uid and returns query
-func SearchQueryLog(uid int64) string {
-
-	row, err := db.QueryRow("SELECT query FROM log WHERE uid=?", uid)
-
-	if checkErr(err) {
-		log.Println("[Recovery] Select query on LOG failed == SearchQueryLog")
-		return ""
-	}
-	var tmpQuery string
-	row.Scan(&tmpQuery)
-	if tmpQuery != "" {
-		return tmpQuery
-	}
-	return ""
-}
-
-/*
-Purely SQL approach: Works only in sqlite though
-Approach 1:
-* create table if not exists tmp (key string PRIMARY KEY, value string, uid INT);
-* insert into tmp select key, value, max(uid)
-from (select * from store union select * from update_tbl) group by key;
-* drop table store;
-* ALTER TABLE tmp RENAME TO store;
-
- Results might not be guranteed due to functional dependency maybe try
- FULL OUTER JOIN, MERGE or INSERT .. ON CONFLICT
-
-Approach 2:
- * With CTEs and UNION - This is guranteed to work.
- WITH cte1 AS (
-         SELECT * FROM A
-          UNION
-         SELECT * FROM B
-     )
-   , cte2 AS (
-         SELECT t.*, ROW_NUMBER() OVER (PARTITION BY key ORDER BY uid DESC) AS n
-           FROM cte1 AS t
-     )
-SELECT *
-  FROM cte2
- WHERE n = 1
-;
-*/
-func ApplyUpdateLogPureSql() bool {
-	stat, err := db.Prepare("create table if not exists tmp (key string PRIMARY KEY, value string, uid INT);")
-	stat.Exec()
-	if checkErr(err) {
-		log.Println("Error!", err.Error())
-		return false
-	}
-	stat, err = db.Prepare("insert into tmp select key, value, max(uid) from (select * from store union select * from update_log) group by key;")
-	stat.Exec()
-	if checkErr(err) {
-		log.Println("Error!", err.Error())
-		return false
-	}
-	stat, err = db.Prepare("DROP TABLE store")
-	if err != nil {
-		log.Println("Error: ", err)
-		return false
-	}
-	stat.Exec()
-	stat, err = db.Prepare("ALTER TABLE tmp RENAME TO store;")
-	if err != nil {
-		log.Println("Error: ", err)
-		return false
-	}
-	stat.Exec()
-
-	return true
-}
-
-// Recovery complete so now apply all Update log
-// Only apply if uid for a key is greater than one existing.
-func ApplyUpdateLog() bool {
-	status := false
-	// read entire update log and row by row
-	rows, err := db.Query("SELECT key, value, uid FROM update_log")
-	if checkErr(err) {
-		log.Println("[Recovery] Select ApplyUpdateLog failed")
-		return status
-	}
-	var key string
-	var value string
-	var uid int
-	for rows.Next() {
-		rows.Scan(&key, &value, &uid)
-		str_row, err := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", key, uid)
-		var tmpkey string
-		row.Scan(&tmpkey)
-		if tmpkey == "" {
-			// This means key doesn't exist or uid is smaller, so now replace/insert from update_log.
-			// Also insert to log.
-			if UpdateKey(qkey, qval, quid, db) {
-				status = true
-			}
-		}
-		// else ignore since the one in store is already latest.
-	}
-	return status
-}
-
 // TODO: Check the holes-finding-SQL query here
 func GetHolesInLogTable() string {
 	query := `
@@ -368,7 +229,7 @@ func GetHolesInLogTable() string {
 func GetMissingQueriesForPeer(start string, end string) *Rows {
 	rows, err := db.QueryRow("SELECT query FROM log WHERE uid>? AND uid<?", start, end)
 	if checkErr(err) {
-		log.Println("[Recovery] Finding gas in log table failed")
+		log.Println("[Recovery] Finding gaps in log table failed")
 		return nil
 	}
 	return rows

@@ -107,6 +107,14 @@ func (s *server) stopServer(ctx context.Context, in *emptypb.Empty) (*pb.Respons
 	return &pb.Response{Value: "", SuccessCode: 0}, nil
 }
 
+func (s *server) partitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
+
+	// On partition healing fetch data that is not there.
+	// We only talk to reachable Alive servers
+	go recoveryStage()
+	return &pb.Response{Value: "", SuccessCode: 0}, nil
+}
+
 // PrintStartMsg prints the start message for the server
 func PrintStartMsg() {
 	name := `
@@ -148,40 +156,16 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.StreamService_FetchRespon
 			}
 		}
 	}
-
-	///////////////////////////////////////////////////////////////////////////
-	// TODO: Remove this entire block, once confirmed that it isn't needed
-	// From the given id search for it in the log table.
-	// ADDON: This could be further improved by having multiple threads divide the search requests
-	// 		 by each invoking searchQueryLog and respond back as and when they find the query. 
-	// Making this ascending order so that on caller crash it will not be left with holes.
-	for qid := in.FromId-in.QLength; qid < in.FromId ; qid++ {
-		que := SearchQueryLog(qid)
-		if que == "" {
-			// if globalID is not seen in log sleep for 3 seconds and try again
-			time.Sleep(3 * time.Second)	
-			// hopefully by now log table has the qid we are interested in.
-			que = SearchQueryLog(qid)
-			// if still nil return client error
-			if que == nil {
-				que = ""
-				ferr = 1
-			}
-		}
-		resp := pb.RecResponse{Query: que, FoundError: ferr}
-		if err := srv.Send(&resp); err != nil {
-			log.Printf("[Recovery] Send error %v", err)
-		}
-	}
-	///////////////////////////////////////////////////////////////////////////
-
-
 	return nil
 }
 
 func rpcRequestLogs(peer_addr string, count int, from int) bool{
 	// send query to DB
 	str := GetHolesInLogTable()
+	if str == "" {
+		log.Fatalf("[Recovery] failed to get holes.")
+		return false
+	}
 
 	// dial peer
 	conn, err := grpc.Dial(peer_addr, grpc.WithInsecure())
@@ -236,53 +220,31 @@ func rpcRequestLogs(peer_addr string, count int, from int) bool{
 ************************************************************
 Recovery stage:
 ************************************************************
-1. Don't serve GETs yet! PUTs can be served. 
+1. Don't serve GETs yet! PUTs can be served. Mark thyself zombie.
 	* However, PUTs go to a different table. update_log
-2. First check with LB for latest global uid
-3. subtract cur_uid - latest_global_uid to get new set of queries
-4. Next broadcast request to a random server for new queries
-	* Not broadcasting to all to reduce wasting cycles.
-5. Receive and apply each query if uid of key X is > current uid of key X
-	* uid is sort of our logical clock.
-6. Recovery stage is almost done once all queries from healer is applied.
-	* Next apply queries from update_log if uid > current uid of key in data_table
-	* In parallel set server to ALIVE so new update requests go to data_table
-	* Once above is done, now invoke LoadKV to load db to memory.
-	* Finally, to enable GETs report to LB that you're ALIVE.
+2. Fetch ALIVE peers
+3. find holes in log table and send them to peer for processing.
+4. Once received all requested queries, apply them.
+5. Load db to memory.
+6. Mark server ALIVE. To get enable GET requests.
 * Time this and report..
 */
-func recoveryStage(local_latest_uid int64) {
-	// Combine step 1 & 2 in a single func in LB. 
-	global_uid := LB.markMeZombie()
+func recoveryStage() {
+	// step 1
+	LB.MarkMe("ZOMBIE");
 
-	//Step 3. // Note not error checking FetchLocalUID
-	lagging := global_uid - local_latest_uid
-	if lagging == 0 {
-		// nothing to recover
-		rec_mu.Lock()
-		rec_cmplt = true
-		rec_mu.Unlock()
-		rec_cond.broadcast()
+	// step 2
+	peers,err := LB.fetchALIVEpeers()
+	if err !=nil {
 		return
 	}
-
-	// Step 4.
-	// fetch peer list from LB, it should also ensure 
-	// these peers are not in recovery themselves.
-	// This is of the form peer_ip:port
-	peers := LB.fetchALIVEpeers()
 	// ADDON: Bellow can be extended to make multiple requests from different peers
 	// Track percentage completion of each recovery and kill other routines after
 	// a threshold.
 	
-	// Step 5.
+	// Step 3 & 4 
+	// Make this seq?
 	if !rpcRequestLogs(peers[rand.Intn(len(peers))], lagging, global_uid) {
-		rec_mu.Lock()
-		rec_cmplt = false
-		rec_mu.Unlock()
-		rec_cond.broadcast()
-		return
-	} else {
 		// Done processing all queries, so mark completion
 		rec_mu.Lock()
 		rec_cmplt = true
@@ -327,13 +289,13 @@ func main() {
 	db, ret = InitDB(db_path)
 	if ret {
 			pb.RegisterRecoverKVServer(s, &server{})
-			PrintStartMsg(port)
+			PrintStartMsg()
 			if err := s.Serve(lis); err != nil {
 				log.Fatalf("Failed to serve: %v\n", err)
 			}
 			server_mode = "ZOMBIE"
 			rec_cmplt = false
-			go recoveryStage(FetchLocalUID())
+			go recoveryStage()
 			// In another thread wait on completion and 
 			// if rec_cmplt is true then enable GET queries.
 			go func(){
@@ -349,33 +311,30 @@ func main() {
 					// Recovery success
 					// Step 6.
 					server_mode = "ALIVE"
-					// Merge update log table to data table, only if uid > one in the data_table.
-					// if ApplyUpdateLogPureSql{ // This is pure SQL version, check perf difference.
-					if ApplyUpdateLog() {
 						// Any new requests comming in will be made on data_table
 						// load the stored data to table
-						if table.LoadKV(db_path, db) {
-							LB.markMeAlive()
-							fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
-						}
+					if table.LoadKV(db_path, db) {
+						LB.markMe("ALIVE");
+						fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
+						return
 					} else {
-						log.Println("Applying recent update log failed.")
+						fmt.Println("Loading to memory failed == Failing server...bye.")
 					}
 				} else {
 					// Recovery failed because either,
-					//		1. The alive server failed during our recovery.
-					//		2. 	LOG replay failed for some reason.
+					//		1. The healer failed during our recovery.
+					//		2. LOG replay failed for some reason.
 					// Try again from another server.
 					log.Fatalf("[Recovery] Recovery failed -- RETRYING AGAIN")
 					// TODO: First delete the new LOG file 
-					//go recoveryStage()
+					go recoveryStage()
 				}
 			}()
 
 			// Now start the recovery server on ip_rec_port
 
 	} else {
-		log.Fatalf("Server failed to start == DB not initialized.")
+		log.Fatalf("Server failed to start == DB not initialized. Bye.")
 	}
 	
 }
