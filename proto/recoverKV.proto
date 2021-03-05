@@ -25,12 +25,6 @@ service RecoverKV {
 
     // Function invoked for partitioning server instance
     rpc partitionServer (PartitionRequest) returns (Response) {}
-
-    // Mark server alive/zombie
-    rpc markMe (MarkStatus) returns (Ack) {}
-
-    // Fetch Alive peers of a server
-    rpc fetchAlivePeers (ServerInfo) returns (AlivePeersResponse) {}
 }
 
 // Defines the internal communication service
@@ -48,6 +42,12 @@ service Internal {
 
     // Function for partition consistency
     rpc partitionServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+    // Mark server alive/zombie
+    rpc markMe (MarkStatus) returns (Ack) {}
+
+    // Fetch Alive peers of a server
+    rpc fetchAlivePeers (ServerInfo) returns (AlivePeersResponse) {}
 }
 
 // The request message containing key

@@ -27,11 +27,10 @@ var lb_ip_addr string
 var lb_port string
 
 rand.Seed(time.Now().Unix()) 
-var rec_cmplt bool
-var rec_mu sync.Mutex
-rec_cond :=sync.NewCond(&rec_mu)
-db_path := "./data/recover.db"
+var db_path string
 // Refer persist.go for log path
+
+var LB pb.UnimplementedInternalClient
 
 // setter and getter for the mode can be helpful for LB
 server_mode := "DEAD" // 3 modes, DEAD->ZOMBIE->ALIVE
@@ -169,12 +168,13 @@ func rpcRequestLogs(peer_addr string, global_uid int64) bool, error{
 
 	// dial peer
 	conn, err := grpc.Dial(peer_addr, grpc.WithInsecure())
+	defer conn.Close()
 	if err != nil {
 		return false, fmt.Errorf("[Recovery] Failed to connect with peer %v : %v",peer_addr, err)
 	}
 
 	// creating stream
-	client := pb.NewStreamServiceClient(conn)
+	client := pb.NewInternalClient(conn)
 	in := &pb.RecRequest{MissingUIDs: str, Address: peer_addr}
 	stream, err := client.FetchQueries(context.Background(), in)
 	if err != nil {
@@ -214,6 +214,28 @@ func rpcRequestLogs(peer_addr string, global_uid int64) bool, error{
 
 }
 
+func MarkMe(status int) int64,error{
+	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	resp, err := server.LB.MarkMe(privateCtx, &pb.MarkStatus{ServerName: ip_serv_port, UpdatedStatus: status})
+	if err!=nil {
+		log.Println("[Recovery] MarkMe failed during recovery!")
+		return 0,error.New("[Recovery] MarkMe failed during recovery!")
+	}
+	return resp.GetGlobalUID(), nil
+}
+
+func FetchAlivePeers() string, error{
+	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	resp, err := server.LB.FetchAlivePeers(privateCtx, &pb.ServerInfo{ServerName: ip_serv_port})
+	if err!=nil {
+		log.Println("[Recovery] Fetching alive peers failed during recovery!")
+		return "",error.New("[Recovery] Fetching alive peers failed during recovery!")
+	}
+	return resp.GetAliveList(), nil
+}
+
 /*
 ************************************************************
 Recovery stage:
@@ -230,13 +252,20 @@ Recovery stage:
 func recoveryStage() {
 
 	server_mode = "ZOMBIE"
-	rec_cmplt = false
 
 	// step 1
-	global_uid := LB.MarkMe("ZOMBIE");
+	global_uid,err := MarkMe(0);
+	if err!= nil {
+		log.Println("MarkMe failed so quiting!")
+		return
+	}
 
 	// step 2
-	peers,err := LB.fetchALIVEpeers()
+	peers,err := FetchALIVEpeers()
+	if err!=nil{
+		log.Println("[Recovery] failed to fetch peers so quiting recovery!")
+		return
+	}
 	peers = string.Split(peers, ",")
 	if err !=nil {
 		log.Println("[Recovery] Failed to get ALIVE peers or peer list is empty.")
@@ -246,7 +275,11 @@ func recoveryStage() {
 	if len(peer) == 0 {
 		server_mode = "ALIVE"
 		if table.LoadKV(db_path, db) {
-			LB.markMe("ALIVE");
+			_, err := MarkMe(1);
+			if err!=nil {
+				log.Println("[Recovery] rec complete but could not mark myself alive!")
+				return
+			}
 			fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
 			return
 		}
@@ -273,7 +306,11 @@ func recoveryStage() {
 			// Any new requests comming in will be made on data_table
 			// load the stored data to table
 		if table.LoadKV(db_path, db) {
-			LB.markMe("ALIVE");
+			_, err := MarkMe(1);
+			if err!=nil {
+				log.Println("[Recovery] rec complete but could not mark myself alive!")
+				return
+			}
 			fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
 			return
 		} else {
@@ -302,7 +339,9 @@ func main() {
 	ip_rec_port := ip_addr+":"+rec_port
 	lb_ip_addr = os.Args[5]
 	lb_port = os.Args[6]
+	ip_lb_port = lb_ip_addr+":"+lb_port
 
+	db_path = "/tmp/"+serv_port
 	// If the file doesn't exist, create it or append to the file
 	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -310,6 +349,16 @@ func main() {
 	}
 	log.SetOutput(file)
 	defer file.Close()
+
+	//Client for LB
+	conn, err := grpc.Dial(ip_lb_port, grpc.WithInsecure())
+	defer conn.Close()
+	if err != nil {
+		return false, fmt.Errorf("[Load balancer] Failed to connect with peer %v : %v",ip_lb_port, err)
+	}
+	LB = pb.NewInternalClient(conn)
+
+
 
 	// Start the server and listen for requests
 	lis, err := net.Listen("tcp", ip_serv_port)
