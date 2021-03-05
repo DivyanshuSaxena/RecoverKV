@@ -1243,11 +1243,10 @@ class InternalResponse PROTOBUF_FINAL :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kValueFieldNumber = 2,
-    kQueryIDFieldNumber = 1,
-    kSuccessCodeFieldNumber = 3,
+    kValueFieldNumber = 1,
+    kSuccessCodeFieldNumber = 2,
   };
-  // string value = 2;
+  // string value = 1;
   void clear_value();
   const std::string& value() const;
   void set_value(const std::string& value);
@@ -1263,16 +1262,7 @@ class InternalResponse PROTOBUF_FINAL :
   std::string* _internal_mutable_value();
   public:
 
-  // int64 queryID = 1;
-  void clear_queryid();
-  ::PROTOBUF_NAMESPACE_ID::int64 queryid() const;
-  void set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::int64 _internal_queryid() const;
-  void _internal_set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value);
-  public:
-
-  // int32 successCode = 3;
+  // int32 successCode = 2;
   void clear_successcode();
   ::PROTOBUF_NAMESPACE_ID::int32 successcode() const;
   void set_successcode(::PROTOBUF_NAMESPACE_ID::int32 value);
@@ -1289,7 +1279,6 @@ class InternalResponse PROTOBUF_FINAL :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr value_;
-  ::PROTOBUF_NAMESPACE_ID::int64 queryid_;
   ::PROTOBUF_NAMESPACE_ID::int32 successcode_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_recoverKV_2eproto;
@@ -1984,11 +1973,26 @@ class RecRequest PROTOBUF_FINAL :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kAddressFieldNumber = 3,
-    kFromIdFieldNumber = 2,
-    kQLengthFieldNumber = 1,
+    kMissingUIDsFieldNumber = 1,
+    kAddressFieldNumber = 2,
   };
-  // string address = 3;
+  // string missingUIDs = 1;
+  void clear_missinguids();
+  const std::string& missinguids() const;
+  void set_missinguids(const std::string& value);
+  void set_missinguids(std::string&& value);
+  void set_missinguids(const char* value);
+  void set_missinguids(const char* value, size_t size);
+  std::string* mutable_missinguids();
+  std::string* release_missinguids();
+  void set_allocated_missinguids(std::string* missinguids);
+  private:
+  const std::string& _internal_missinguids() const;
+  void _internal_set_missinguids(const std::string& value);
+  std::string* _internal_mutable_missinguids();
+  public:
+
+  // string address = 2;
   void clear_address();
   const std::string& address() const;
   void set_address(const std::string& value);
@@ -2004,24 +2008,6 @@ class RecRequest PROTOBUF_FINAL :
   std::string* _internal_mutable_address();
   public:
 
-  // int64 fromId = 2;
-  void clear_fromid();
-  ::PROTOBUF_NAMESPACE_ID::int64 fromid() const;
-  void set_fromid(::PROTOBUF_NAMESPACE_ID::int64 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::int64 _internal_fromid() const;
-  void _internal_set_fromid(::PROTOBUF_NAMESPACE_ID::int64 value);
-  public:
-
-  // int32 qLength = 1;
-  void clear_qlength();
-  ::PROTOBUF_NAMESPACE_ID::int32 qlength() const;
-  void set_qlength(::PROTOBUF_NAMESPACE_ID::int32 value);
-  private:
-  ::PROTOBUF_NAMESPACE_ID::int32 _internal_qlength() const;
-  void _internal_set_qlength(::PROTOBUF_NAMESPACE_ID::int32 value);
-  public:
-
   // @@protoc_insertion_point(class_scope:recoverKV.RecRequest)
  private:
   class _Internal;
@@ -2029,9 +2015,8 @@ class RecRequest PROTOBUF_FINAL :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr missinguids_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr address_;
-  ::PROTOBUF_NAMESPACE_ID::int64 fromid_;
-  ::PROTOBUF_NAMESPACE_ID::int32 qlength_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_recoverKV_2eproto;
 };
@@ -3077,27 +3062,7 @@ inline void InternalRequest::set_allocated_value(std::string* value) {
 
 // InternalResponse
 
-// int64 queryID = 1;
-inline void InternalResponse::clear_queryid() {
-  queryid_ = PROTOBUF_LONGLONG(0);
-}
-inline ::PROTOBUF_NAMESPACE_ID::int64 InternalResponse::_internal_queryid() const {
-  return queryid_;
-}
-inline ::PROTOBUF_NAMESPACE_ID::int64 InternalResponse::queryid() const {
-  // @@protoc_insertion_point(field_get:recoverKV.InternalResponse.queryID)
-  return _internal_queryid();
-}
-inline void InternalResponse::_internal_set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  
-  queryid_ = value;
-}
-inline void InternalResponse::set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  _internal_set_queryid(value);
-  // @@protoc_insertion_point(field_set:recoverKV.InternalResponse.queryID)
-}
-
-// string value = 2;
+// string value = 1;
 inline void InternalResponse::clear_value() {
   value_.ClearToEmpty();
 }
@@ -3158,7 +3123,7 @@ inline void InternalResponse::set_allocated_value(std::string* value) {
   // @@protoc_insertion_point(field_set_allocated:recoverKV.InternalResponse.value)
 }
 
-// int32 successCode = 3;
+// int32 successCode = 2;
 inline void InternalResponse::clear_successcode() {
   successcode_ = 0;
 }
@@ -3421,47 +3386,68 @@ inline void Ack::set_globaluid(::PROTOBUF_NAMESPACE_ID::int64 value) {
 
 // RecRequest
 
-// int32 qLength = 1;
-inline void RecRequest::clear_qlength() {
-  qlength_ = 0;
+// string missingUIDs = 1;
+inline void RecRequest::clear_missinguids() {
+  missinguids_.ClearToEmpty();
 }
-inline ::PROTOBUF_NAMESPACE_ID::int32 RecRequest::_internal_qlength() const {
-  return qlength_;
+inline const std::string& RecRequest::missinguids() const {
+  // @@protoc_insertion_point(field_get:recoverKV.RecRequest.missingUIDs)
+  return _internal_missinguids();
 }
-inline ::PROTOBUF_NAMESPACE_ID::int32 RecRequest::qlength() const {
-  // @@protoc_insertion_point(field_get:recoverKV.RecRequest.qLength)
-  return _internal_qlength();
+inline void RecRequest::set_missinguids(const std::string& value) {
+  _internal_set_missinguids(value);
+  // @@protoc_insertion_point(field_set:recoverKV.RecRequest.missingUIDs)
 }
-inline void RecRequest::_internal_set_qlength(::PROTOBUF_NAMESPACE_ID::int32 value) {
+inline std::string* RecRequest::mutable_missinguids() {
+  // @@protoc_insertion_point(field_mutable:recoverKV.RecRequest.missingUIDs)
+  return _internal_mutable_missinguids();
+}
+inline const std::string& RecRequest::_internal_missinguids() const {
+  return missinguids_.Get();
+}
+inline void RecRequest::_internal_set_missinguids(const std::string& value) {
   
-  qlength_ = value;
+  missinguids_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArena());
 }
-inline void RecRequest::set_qlength(::PROTOBUF_NAMESPACE_ID::int32 value) {
-  _internal_set_qlength(value);
-  // @@protoc_insertion_point(field_set:recoverKV.RecRequest.qLength)
+inline void RecRequest::set_missinguids(std::string&& value) {
+  
+  missinguids_.Set(
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::move(value), GetArena());
+  // @@protoc_insertion_point(field_set_rvalue:recoverKV.RecRequest.missingUIDs)
+}
+inline void RecRequest::set_missinguids(const char* value) {
+  GOOGLE_DCHECK(value != nullptr);
+  
+  missinguids_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(value), GetArena());
+  // @@protoc_insertion_point(field_set_char:recoverKV.RecRequest.missingUIDs)
+}
+inline void RecRequest::set_missinguids(const char* value,
+    size_t size) {
+  
+  missinguids_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, ::std::string(
+      reinterpret_cast<const char*>(value), size), GetArena());
+  // @@protoc_insertion_point(field_set_pointer:recoverKV.RecRequest.missingUIDs)
+}
+inline std::string* RecRequest::_internal_mutable_missinguids() {
+  
+  return missinguids_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArena());
+}
+inline std::string* RecRequest::release_missinguids() {
+  // @@protoc_insertion_point(field_release:recoverKV.RecRequest.missingUIDs)
+  return missinguids_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArena());
+}
+inline void RecRequest::set_allocated_missinguids(std::string* missinguids) {
+  if (missinguids != nullptr) {
+    
+  } else {
+    
+  }
+  missinguids_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), missinguids,
+      GetArena());
+  // @@protoc_insertion_point(field_set_allocated:recoverKV.RecRequest.missingUIDs)
 }
 
-// int64 fromId = 2;
-inline void RecRequest::clear_fromid() {
-  fromid_ = PROTOBUF_LONGLONG(0);
-}
-inline ::PROTOBUF_NAMESPACE_ID::int64 RecRequest::_internal_fromid() const {
-  return fromid_;
-}
-inline ::PROTOBUF_NAMESPACE_ID::int64 RecRequest::fromid() const {
-  // @@protoc_insertion_point(field_get:recoverKV.RecRequest.fromId)
-  return _internal_fromid();
-}
-inline void RecRequest::_internal_set_fromid(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  
-  fromid_ = value;
-}
-inline void RecRequest::set_fromid(::PROTOBUF_NAMESPACE_ID::int64 value) {
-  _internal_set_fromid(value);
-  // @@protoc_insertion_point(field_set:recoverKV.RecRequest.fromId)
-}
-
-// string address = 3;
+// string address = 2;
 inline void RecRequest::clear_address() {
   address_.ClearToEmpty();
 }

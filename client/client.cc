@@ -10,9 +10,9 @@ int RecoverKVClient::getValue(char *client_id, char *key, char *value)
     request.set_clientid(client_id);
     request.set_key(key);
     request.set_value("");
-
+    cout << "check 1" << endl;
     Status status = stub_->getValue(&context, request, &response);
-
+    cout << "check 2" << endl;
     if (status.ok())
     {
         int successCode = response.successcode();
@@ -225,7 +225,10 @@ int KV739Client::kv739_init(char **server_names)
             return -1;
         }
 
-        servers_list = servers_list + server_names[idx] + ",";
+        if (idx != 0) {
+            servers_list = servers_list + ",";
+        }
+        servers_list = servers_list + server_names[idx];
         idx += 1;
     }
 
@@ -233,7 +236,7 @@ int KV739Client::kv739_init(char **server_names)
     uuid_generate_time_safe(id);
     client_id = new char[128];
     uuid_unparse(id, client_id);
-
+    cout << "client id: " << client_id << endl;
     // Send server names to load balancer
     if (client->initLBState(client_id, servers_list) == -1)
     {

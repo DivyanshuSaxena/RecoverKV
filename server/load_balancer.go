@@ -15,6 +15,8 @@ import (
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 /*
@@ -77,6 +79,10 @@ var (
 
 type loadBalancer struct {
 	pb.UnimplementedRecoverKVServer
+}
+
+type loadBalancerInternal struct {
+	pb.UnimplementedInternalServer
 }
 
 // CanContactServer checks whether a given clientID can contact the given server.
@@ -192,9 +198,10 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 	emptyMsg := new(emptypb.Empty)
 	_, err := serverList[serverID].conn.StopServer(privateCtx, emptyMsg)
 
-	// check it it exists, if not successCode = -1
-	if err != nil || privateCtx.Err() == context.DeadlineExceeded {
+	// check it the server has exited, if not successCode = -1
+	if err != nil {
 		// TODO: Check if this will respond back in case the server has crashed
+		log.Printf("Error: %v\n", err)
 		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("server stop failed")
 	}
 
@@ -228,6 +235,7 @@ func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*
 
 	// Get the serverIDs that must be added in the Client Permission object
 	servers := make([]int, len(serverListSlice))
+	log.Println(serverListSlice)
 
 	for i, serverName := range serverListSlice {
 		serverID := serverNameMap[serverName]
@@ -277,7 +285,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	var val string = ""
 
 	clientID := in.GetClientID()
-	log.Printf("Object ID Received in Get: %v\n", clientID)
+	// log.Printf("Object ID Received in Get: %v\n", clientID)
 
 	clientData, prs := clientMap[clientID]
 	if !prs {
@@ -292,40 +300,40 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	maxTries := 10
 	// In case a server times out, retry connection for maximum maxTries
 	for i := 0; i < maxTries; i++ {
+		i = i + 1
+
 		// Find any alive server
 		serverID := clientData.servers[rand.Intn(nodes)]
-
 		serverList[serverID].lock.Lock()
 		mode := serverList[serverID].mode
 		serverList[serverID].lock.Unlock()
-
-		for mode != 1 {
-			serverID = clientData.servers[rand.Intn(nodes)]
-			serverList[serverID].lock.Lock()
-			mode = serverList[serverID].mode
-			serverList[serverID].lock.Unlock()
+		if mode != 1 {
+			continue
 		}
 		serverToContact := serverList[serverID]
 
 		// Send request to the respective server
 		privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		// If timed out, mark node as DEAD
-		if privateCtx.Err() == context.DeadlineExceeded {
-			log.Printf("Timeout while contacting server %v\n", serverToContact.name)
 
-			serverToContact.lock.Lock()
-			serverToContact.mode = -1
-			serverToContact.lock.Unlock()
-			i = i + 1
-		} else {
-			// ServerInstance.conn is Read only -- no lock needed for safety
-			resp, err := serverList[serverID].conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
-			if err != nil {
-				return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
+		// ServerInstance.conn is Read only -- no lock needed for safety
+		resp, err := serverList[serverID].conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
+		if err != nil {
+			statusErr, _ := status.FromError(err)
+
+			// If timed out, mark node as DEAD
+			if statusErr.Code() == codes.DeadlineExceeded {
+				log.Printf("Timeout while contacting server %v\n", serverToContact.name)
+
+				serverToContact.lock.Lock()
+				serverToContact.mode = -1
+				serverToContact.lock.Unlock()
 			}
-			return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
+			// TODO: Restart the server by executing a shell script
+			continue
 		}
+
+		return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
 	}
 
 	// No successful connection could be made
@@ -338,7 +346,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	var val string = "NULL"
 
 	clientID := in.GetClientID()
-	log.Printf("Object ID Received in Set: %v\n", clientID)
+	// log.Printf("Object ID Received in Set: %v\n", clientID)
 
 	_, prs := clientMap[clientID]
 	if !prs {
@@ -356,8 +364,6 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	savedQueryID = queryID
 	queryIDMu.Unlock()
 
-	// Resolve conflicting return values
-	var latestUID int64 = 0
 	// Count number of successful writes
 	successfulPuts := 0
 
@@ -366,23 +372,29 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 			// Send request to the respective server
 			privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			// If timed out, mark node as DEAD
-			if privateCtx.Err() == context.DeadlineExceeded {
-				log.Printf("Timeout while contacting server %v\n", server.name)
-
-				server.lock.Lock()
-				server.mode = -1
-				server.lock.Unlock()
-				continue
-			}
 
 			// If connection did not time out, proceed with the request
 			resp, err := server.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
-			if err == nil {
-				// Do something if inconsistent values read from different servers
-				successfulPuts = successfulPuts + 1
-				uid := resp.GetQueryID()
-				if uid > latestUID {
+			if err != nil {
+				statusErr, _ := status.FromError(err)
+
+				// If timed out, mark node as DEAD
+				if statusErr.Code() == codes.DeadlineExceeded {
+					log.Printf("Timeout while contacting server %v\n", server.name)
+
+					server.lock.Lock()
+					server.mode = -1
+					server.lock.Unlock()
+				}
+				// TODO: Restart the server by executing a shell script
+			} else {
+				// COMPLETED: Do something if inconsistent values read from different servers
+				// log.Printf("Put succeeded with resp: %v\n", resp)
+				// Inconsistency can be caused due to recovering nodes. Hence, return the value of an ALIVE node
+				// Currently, server does not fetch the uid from the data table
+				if server.mode == 1 {
+					// TODO: How should we evaluate successful puts? In case of recovering and alive nodes
+					successfulPuts = successfulPuts + 1
 					val = resp.GetValue()
 					successCode = resp.GetSuccessCode()
 				}
@@ -390,7 +402,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		}
 	}
 
-	if successfulPuts > 1 {
+	if successfulPuts > 0 {
 		return &pb.Response{Value: val, SuccessCode: successCode}, nil
 	}
 
@@ -398,7 +410,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	return &pb.Response{Value: "", SuccessCode: -2}, errors.New("operation failed")
 }
 
-func (lb *loadBalancer) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack, error) {
+func (lb *loadBalancerInternal) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack, error) {
 	// COMPLETED: Any corner cases (or error handling) required here?
 	serverName := in.GetServerName()
 	updatedStatus := in.GetNewStatus()
@@ -418,7 +430,7 @@ func (lb *loadBalancer) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack,
 	return &pb.Ack{GlobalUID: globalUID}, nil
 }
 
-func (lb *loadBalancer) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) (*pb.AlivePeersResponse, error) {
+func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) (*pb.AlivePeersResponse, error) {
 	// COMPLETED: Any corner cases (or error handling) required here?
 	serverName := in.GetServerName()
 	serverID := serverNameMap[serverName]
@@ -470,7 +482,7 @@ func main() {
 		serverNameMap[name] = i
 
 		// Assumes that the servers are already running
-		conn, err := grpc.Dial(name, grpc.WithInsecure(), grpc.WithBlock())
+		conn, err := grpc.Dial(name, grpc.WithInsecure())
 		if err != nil {
 			log.Fatalf("did not connect: %v\n", err)
 		}
@@ -490,7 +502,9 @@ func main() {
 	log.Println("Recover LB listening on port" + port)
 
 	pb.RegisterRecoverKVServer(lb, &loadBalancer{})
+	pb.RegisterInternalServer(lb, &loadBalancerInternal{})
 	if err := lb.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v\n", err)
 	}
+
 }

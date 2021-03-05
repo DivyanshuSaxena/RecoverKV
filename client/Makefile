@@ -36,7 +36,7 @@ client.o: client.cc
 %.pb.cc: %.proto
 	protoc -I $(PROTOS_PATH) --cpp_out=. $<
 
-test: performance_test correctness_test multiperf_test
+test: correctness_test
 
 performance_test: tests/performance_test.cc
 	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
@@ -45,7 +45,7 @@ multiperf_test: tests/multiperf_test.cc
 	$(CXX) $(CXXFLAGS) $< -L. $(THFLAGS) -l739kv -Wl,-rpath=. -o $@
 
 correctness_test: tests/correctness_test.cc
-	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
+	$(CXX) $(CXXFLAGS) $< -L. -l739kv -g -Wl,-rpath=. -o $@
 
 clean:
 	rm -f *.o *.pb.cc *_test *.log

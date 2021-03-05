@@ -93,9 +93,8 @@ message InternalRequest {
 
 // The response message containing response
 message InternalResponse {
-  int64 queryID = 1;
-  string value = 2;
-  int32 successCode = 3;
+  string value = 1;
+  int32 successCode = 2;
 }
 
 message MarkStatus {
