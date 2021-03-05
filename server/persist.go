@@ -145,7 +145,9 @@ func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool {
 	var value string
 	for rows.Next() {
 		rows.Scan(&key, &value)
+		tableMu.Lock()
 		(*table)[key] = value
+		tableMu.Unlock()
 	}
 
 	return true
@@ -196,8 +198,18 @@ func ApplyQuery(query string) bool {
 	//TODO: Add logs to this function
 }
 
+func FetchMaxLocalUID(path string) int64 {
+	st,err := database.QueryRow("SELECT MAX(uid) FROM store")
+	if err != nil {
+		log.Println)"[Recovery] failed during query FetchLocalUID"
+	}
+	var luid string
+	st.Scan(&luid)
+	return int64(luid)
+}
+
 // TODO: Check the holes-finding-SQL query here
-func GetHolesInLogTable() string {
+func GetHolesInLogTable(global_uid int64) string {
 	query := `
 	SELECT a AS id, b AS next_id FROM (
 		SELECT a1.uid AS a , MIN(a2.uid) AS b
@@ -222,6 +234,8 @@ func GetHolesInLogTable() string {
 			ret_str += ("|" + least_prs_id + "-" + max_prs_id)
 		}
 	}
+	// This is to ensure there aren't any trailing holes upto global UID.
+	append(ret_str, fmt.Sprintf("|%d-%d", FetchMaxLocalUID(), global_uid))
 	return ret_str
 }
 
