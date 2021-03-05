@@ -22,5 +22,4 @@ lb:
 	go build -o recoverLB load_balancer.go
 
 clean:
-	rm -r gen
 	rm recoverKV recoverLB *.log

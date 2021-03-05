@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc"
 	"strings"
 	"io"
-	"errors"
 )
 
 var ip_addr string
@@ -220,8 +219,8 @@ func MarkMe(status int32) (int64,error){
 	defer cancel()
 	resp, err := LB.MarkMe(privateCtx, &pb.MarkStatus{ServerName: ip_serv_port,NewStatus: status})
 	if err!=nil {
-		log.Println("[Recovery] MarkMe failed during recovery!")
-		return 0,errors.New("[Recovery] MarkMe failed during recovery!")
+		log.Println("[Recovery] MarkMe failed during recovery!", err)
+		return 0,err
 	}
 	return resp.GetGlobalUID(), nil
 }
@@ -232,7 +231,7 @@ func FetchAlivePeers() (string,error){
 	resp, err := LB.FetchAlivePeers(privateCtx, &pb.ServerInfo{ServerName: ip_serv_port})
 	if err!=nil {
 		log.Println("[Recovery] Fetching alive peers failed during recovery!")
-		return "",errors.New("[Recovery] Fetching alive peers failed during recovery!")
+		return "", err
 	}
 	return resp.GetAliveList(), nil
 }
@@ -352,14 +351,15 @@ func main() {
 	defer file.Close()
 
 	//Client for LB
-	conn, err := grpc.Dial(ip_lb_port, grpc.WithInsecure())
+	conn, err := grpc.Dial("127.0.0.1:50050", grpc.WithInsecure())
+	fmt.Println("ip_lb_port ",ip_lb_port)
 	defer conn.Close()
 	if err != nil {
 		log.Fatalf("[Load balancer] Failed to connect with peer %v : %v",ip_lb_port, err)
 	}
 	LB = pb.NewInternalClient(conn)
 
-
+	fmt.Println("Connected to LB correctly")
 
 	// Start the server and listen for requests
 	lis, err := net.Listen("tcp", ip_serv_port)
@@ -374,23 +374,23 @@ func main() {
 	var ret bool
 	db, ret = InitDB(db_path)
 	if ret {
+			go recoveryStage()
+			PrintStartMsg()
+		go func(){
 			// Serving GET/PUT
 			pb.RegisterInternalServer(s, &server{})
 			if err := s.Serve(lis); err != nil {
 				log.Fatalf("Failed to serve GET/PUT: %v\n", err)
 			}
+		}()
 			// Serving recovery stage
 			pb.RegisterInternalServer(s2, &server{})
 			if err := s2.Serve(lis2); err != nil {
 				log.Fatalf("Failed to serve recover: %v\n", err)
 			}
-
-			// Recovery stage 
-			go recoveryStage()
-			PrintStartMsg()
+			// Recovery stage
 
 	} else {
 		log.Fatalf("Server failed to start == DB not initialized. Bye.")
 	}
-	
 }
