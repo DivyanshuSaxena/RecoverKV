@@ -212,6 +212,7 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
         cout << "Failed to send kill request to " << server_name << " in TEST 4" << endl;
         return 0;
     }
+
     // Ideally, we should not have to wait for any command
     sleep(5);
 
@@ -471,6 +472,9 @@ int main(int argc, char *argv[])
     // tests_passed += test_correctness_key_existance(client);
     cout << "-----------------------------------------" << endl;
 
+    // tests_passed += test_correctness_partition(client);
+    cout << "-----------------------------------------" << endl;
+
     // free state and disconnect from server
     if (client->kv739_shutdown() == -1) {
     	cout << "Server shutdown falure" << endl;
@@ -483,6 +487,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < argc; i++)
     	delete serverNames[i];
     delete serverNames;
+    delete client;
 
     return 0;
 }
