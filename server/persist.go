@@ -19,7 +19,7 @@ var prep_query_log string
 //type MyMap map[string]string
 
 var updateStatement *sql.Stmt
-var updateLogStatement *sql.Smt
+var updateLogStatement *sql.Stmt
 
 func init() {
 	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
@@ -79,39 +79,28 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 
 // UpdateKey updates the `value` for `key` in DB.
 // It also stores the uid of last query that modified it.
-func UpdateKey(key string, value string, int64 uid, database *sql.DB) bool {
+func UpdateKey(key string, value string, uid int64, database *sql.DB) bool {
 
 	// Prepare query for log file
-	cur_query := strings.Replace(prep_query, "?", fmt.Sprintf("'%v'", val1), 1)
-	cur_query = strings.Replace(cur_query, "?", fmt.Sprintf("'%v'", val2), 1)
-	cur_query = strings.Replace(cur_query, "?", strconv.FormatInt(val3, 10), 1)
+	cur_query := strings.Replace(prep_query, "?", fmt.Sprintf("'%v'", key), 1)
+	cur_query = strings.Replace(cur_query, "?", fmt.Sprintf("'%v'", value), 1)
+	cur_query = strings.Replace(cur_query, "?", strconv.FormatInt(uid, 10), 1)
 
-	if server_mode == "ALIVE" {
-		_, err := updateStatement.Exec(key, value, uid)
+	_, err := updateStatement.Exec(key, value, uid)
 
-		if checkErr(err) {
-			log.Println("=== KEY UPDATE FAILED:", err.Error())
-			return false
-		}
-
-		// Update log table now
-		_, err = updateLogStatement.Exec(uid, cur_query)
-		if checkErr(err) {
-			log.Println("=== LOG UPDATE FAILED:", err.Error())
-			return false
-		}
-
-		return true
-	} else {
-		// In Zombie mode. So send all updates to update_log
-		// table and don't write it to store or log.
-		_, err := updateLogTableStatement.Exec(key, value, uid)
-		if checkErr(err) {
-			log.Println("=== REPLACE ON UPDATE LOG TABLE FAILED:", err.Error())
-			return false
-		}
-		return true
+	if checkErr(err) {
+		log.Println("=== KEY UPDATE FAILED:", err.Error())
+		return false
 	}
+
+	// Update log table now
+	_, err = updateLogStatement.Exec(uid, cur_query)
+	if checkErr(err) {
+		log.Println("=== LOG UPDATE FAILED:", err.Error())
+		return false
+	}
+
+	return true
 }
 
 // GetValue returns value for `key` in the DB
@@ -169,16 +158,13 @@ func ApplyQuery(query string) bool {
 	tmp := strings.SplitN(query, " ", -1)
 	// Get last element and remove '(),' from it.
 	var re = regexp.MustCompile(`(^\(|\)|,)`)
-	quid := int64(re.ReplaceAllString(tmp[len(tmp)-1], ""))
+	quidStr, _ := strconv.Atoi(re.ReplaceAllString(tmp[len(tmp)-1], ""))
+	quid := int64(quidStr)
 	qval := re.ReplaceAllString(tmp[len(tmp)-2], "")
 	qkey := re.ReplaceAllString(tmp[len(tmp)-3], "")
 
 	// check with db and see if quid is larger,
-	row, err := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", qkey, quid)
-	if checkErr(err) {
-		log.Println("[Recovery] Select query on STORE failed == ApplyQuery")
-		return false
-	}
+	row := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", qkey, quid)
 	var tmpkey string
 	row.Scan(&tmpkey)
 	if tmpkey == "" {
@@ -198,14 +184,12 @@ func ApplyQuery(query string) bool {
 	//TODO: Add logs to this function
 }
 
-func FetchMaxLocalUID(path string) int64 {
-	st,err := database.QueryRow("SELECT MAX(uid) FROM store")
-	if err != nil {
-		log.Println)"[Recovery] failed during query FetchLocalUID"
-	}
+func FetchMaxLocalUID() int64 {
+	st:= db.QueryRow("SELECT MAX(uid) FROM store")
 	var luid string
 	st.Scan(&luid)
-	return int64(luid)
+	tmp, _ := strconv.Atoi(luid)
+	return int64(tmp)
 }
 
 // TODO: Check the holes-finding-SQL query here
@@ -219,15 +203,18 @@ func GetHolesInLogTable(global_uid int64) string {
 	WHERE b > a + 1`
 	rows, err := db.Query(query)
 	if checkErr(err) {
-		log.Println("[Recovery] Finding gas in log table failed")
-		return status
+		log.Println("[Recovery] Finding gaps in log table failed")
+		return ""
 	}
 
 	ret_str := ""
 	var least_prs_id string
 	var max_prs_id string
 	for rows.Next() {
-		rows.Scan(&least_prs_id, &max_prs_id)
+		err = rows.Scan(&least_prs_id, &max_prs_id)
+		if err != nil && err != sql.ErrNoRows {
+			log.Println("Error in GetHoles")
+		}
 		if ret_str == "" {
 			ret_str += (least_prs_id + "-" + max_prs_id)
 		} else {
@@ -235,13 +222,16 @@ func GetHolesInLogTable(global_uid int64) string {
 		}
 	}
 	// This is to ensure there aren't any trailing holes upto global UID.
-	append(ret_str, fmt.Sprintf("|%d-%d", FetchMaxLocalUID(), global_uid))
+	if ret_str == "" {
+		return fmt.Sprintf("%d-%d", FetchMaxLocalUID(), global_uid)
+	}
+	ret_str +=fmt.Sprintf("|%d-%d", FetchMaxLocalUID(), global_uid) 
 	return ret_str
 }
 
 // TODO: Check the peer-find-relevant-qids query here
-func GetMissingQueriesForPeer(start string, end string) *Rows {
-	rows, err := db.QueryRow("SELECT query FROM log WHERE uid>? AND uid<?", start, end)
+func GetMissingQueriesForPeer(start string, end string) *sql.Rows {
+	rows,err := db.Query("SELECT query FROM log WHERE uid>? AND uid<?", start, end)
 	if checkErr(err) {
 		log.Println("[Recovery] Finding gaps in log table failed")
 		return nil

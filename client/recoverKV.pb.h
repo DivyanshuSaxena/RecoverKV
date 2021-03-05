@@ -1243,10 +1243,11 @@ class InternalResponse PROTOBUF_FINAL :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kValueFieldNumber = 1,
-    kSuccessCodeFieldNumber = 2,
+    kValueFieldNumber = 2,
+    kQueryIDFieldNumber = 1,
+    kSuccessCodeFieldNumber = 3,
   };
-  // string value = 1;
+  // string value = 2;
   void clear_value();
   const std::string& value() const;
   void set_value(const std::string& value);
@@ -1262,7 +1263,16 @@ class InternalResponse PROTOBUF_FINAL :
   std::string* _internal_mutable_value();
   public:
 
-  // int32 successCode = 2;
+  // int64 queryID = 1;
+  void clear_queryid();
+  ::PROTOBUF_NAMESPACE_ID::int64 queryid() const;
+  void set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::int64 _internal_queryid() const;
+  void _internal_set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value);
+  public:
+
+  // int32 successCode = 3;
   void clear_successcode();
   ::PROTOBUF_NAMESPACE_ID::int32 successcode() const;
   void set_successcode(::PROTOBUF_NAMESPACE_ID::int32 value);
@@ -1279,6 +1289,7 @@ class InternalResponse PROTOBUF_FINAL :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr value_;
+  ::PROTOBUF_NAMESPACE_ID::int64 queryid_;
   ::PROTOBUF_NAMESPACE_ID::int32 successcode_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_recoverKV_2eproto;
@@ -1836,6 +1847,18 @@ class Ack PROTOBUF_FINAL :
 
   // accessors -------------------------------------------------------
 
+  enum : int {
+    kGlobalUIDFieldNumber = 1,
+  };
+  // int64 globalUID = 1;
+  void clear_globaluid();
+  ::PROTOBUF_NAMESPACE_ID::int64 globaluid() const;
+  void set_globaluid(::PROTOBUF_NAMESPACE_ID::int64 value);
+  private:
+  ::PROTOBUF_NAMESPACE_ID::int64 _internal_globaluid() const;
+  void _internal_set_globaluid(::PROTOBUF_NAMESPACE_ID::int64 value);
+  public:
+
   // @@protoc_insertion_point(class_scope:recoverKV.Ack)
  private:
   class _Internal;
@@ -1843,6 +1866,7 @@ class Ack PROTOBUF_FINAL :
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::int64 globaluid_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_recoverKV_2eproto;
 };
@@ -3053,7 +3077,27 @@ inline void InternalRequest::set_allocated_value(std::string* value) {
 
 // InternalResponse
 
-// string value = 1;
+// int64 queryID = 1;
+inline void InternalResponse::clear_queryid() {
+  queryid_ = PROTOBUF_LONGLONG(0);
+}
+inline ::PROTOBUF_NAMESPACE_ID::int64 InternalResponse::_internal_queryid() const {
+  return queryid_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::int64 InternalResponse::queryid() const {
+  // @@protoc_insertion_point(field_get:recoverKV.InternalResponse.queryID)
+  return _internal_queryid();
+}
+inline void InternalResponse::_internal_set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value) {
+  
+  queryid_ = value;
+}
+inline void InternalResponse::set_queryid(::PROTOBUF_NAMESPACE_ID::int64 value) {
+  _internal_set_queryid(value);
+  // @@protoc_insertion_point(field_set:recoverKV.InternalResponse.queryID)
+}
+
+// string value = 2;
 inline void InternalResponse::clear_value() {
   value_.ClearToEmpty();
 }
@@ -3114,7 +3158,7 @@ inline void InternalResponse::set_allocated_value(std::string* value) {
   // @@protoc_insertion_point(field_set_allocated:recoverKV.InternalResponse.value)
 }
 
-// int32 successCode = 2;
+// int32 successCode = 3;
 inline void InternalResponse::clear_successcode() {
   successcode_ = 0;
 }
@@ -3352,6 +3396,26 @@ inline void AlivePeersResponse::set_allocated_alivelist(std::string* alivelist) 
 // -------------------------------------------------------------------
 
 // Ack
+
+// int64 globalUID = 1;
+inline void Ack::clear_globaluid() {
+  globaluid_ = PROTOBUF_LONGLONG(0);
+}
+inline ::PROTOBUF_NAMESPACE_ID::int64 Ack::_internal_globaluid() const {
+  return globaluid_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::int64 Ack::globaluid() const {
+  // @@protoc_insertion_point(field_get:recoverKV.Ack.globalUID)
+  return _internal_globaluid();
+}
+inline void Ack::_internal_set_globaluid(::PROTOBUF_NAMESPACE_ID::int64 value) {
+  
+  globaluid_ = value;
+}
+inline void Ack::set_globaluid(::PROTOBUF_NAMESPACE_ID::int64 value) {
+  _internal_set_globaluid(value);
+  // @@protoc_insertion_point(field_set:recoverKV.Ack.globalUID)
+}
 
 // -------------------------------------------------------------------
 
