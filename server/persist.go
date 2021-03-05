@@ -185,7 +185,7 @@ func ApplyQuery(query string) bool {
 }
 
 func FetchMaxLocalUID() int64 {
-	st:= db.QueryRow("SELECT MAX(uid) FROM store")
+	st := db.QueryRow("SELECT MAX(uid) FROM store")
 	var luid string
 	st.Scan(&luid)
 	tmp, _ := strconv.Atoi(luid)
@@ -225,13 +225,13 @@ func GetHolesInLogTable(global_uid int64) string {
 	if ret_str == "" {
 		return fmt.Sprintf("%d-%d", FetchMaxLocalUID(), global_uid)
 	}
-	ret_str +=fmt.Sprintf("|%d-%d", FetchMaxLocalUID(), global_uid) 
+	ret_str += fmt.Sprintf("|%d-%d", FetchMaxLocalUID(), global_uid)
 	return ret_str
 }
 
 // TODO: Check the peer-find-relevant-qids query here
 func GetMissingQueriesForPeer(start string, end string) *sql.Rows {
-	rows,err := db.Query("SELECT query FROM log WHERE uid>? AND uid<?", start, end)
+	rows, err := db.Query("SELECT query FROM log WHERE uid>? AND uid<?", start, end)
 	if checkErr(err) {
 		log.Println("[Recovery] Finding gaps in log table failed")
 		return nil

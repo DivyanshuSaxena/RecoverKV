@@ -241,7 +241,7 @@ int KV739Client::kv739_init(char **server_names)
     if (client->initLBState(client_id, servers_list) == -1)
     {
         cout << "[ERROR]"
-             << "Could not establish connection with server instances or lb" << endl;
+             << "Could not establish connection with server instances" << endl;
         return -1;
     }
 

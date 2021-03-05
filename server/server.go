@@ -27,7 +27,9 @@ var rec_port string
 var server_id string
 var lb_ip_addr string
 var lb_port string
+var ip_lb_port string
 var ip_serv_port string
+var ip_rec_port string
 var db_path string
 
 // Refer persist.go for log path
@@ -57,7 +59,7 @@ type server struct {
 // 				 ("", 1) if the key is absent
 func (s *server) GetValue(ctx context.Context, in *pb.InternalRequest) (*pb.InternalResponse, error) {
 	key := in.GetKey()
-	//log.Printf("GetValue Received: %v\n", key)
+	log.Printf("GetValue Received: %v\n", key)
 	var successCode int32 = 0
 
 	tableMu.Lock()
@@ -101,16 +103,17 @@ func (s *server) StopServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Em
 	go func() {
 		fmt.Println("Stop server received. Waiting")
 		// wait for 1 second
-		time.Sleep(1 * time.Second)
+		time.Sleep(time.Second)
 		// then exit the parent process
 		fmt.Println("Exited")
+		// panic("Unclean exit")
 		os.Exit(0)
 	}()
 
 	return new(emptypb.Empty), nil
 }
 
-func (s *server) partitionServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Empty, error) {
+func (s *server) PartitionServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Empty, error) {
 
 	// On partition healing fetch data that is not there.
 	// We only talk to reachable Alive servers
@@ -143,8 +146,11 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServ
 	ferr = 0
 	// Parse the received missing UIDs from the recovering node
 	missingList := strings.Split(in.GetMissingUIDs(), "|")
+	log.Printf("Missing List received from peer: %v %v\n", missingList, in.GetMissingUIDs())
+
 	// add a element with
 	for _, missingRange := range missingList {
+		log.Printf("Queries for range %v\n", missingRange)
 		// Extract the individual ranges
 		rangeBound := strings.Split(missingRange, "-")
 		// Can send multiple queries to the db here. But rather sending a single one.
@@ -152,6 +158,7 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServ
 		var tmpQuery string
 		for rows.Next() {
 			rows.Scan(&tmpQuery)
+			log.Printf("Found missing query %v\n", tmpQuery)
 			if tmpQuery == "" {
 				ferr = 1
 			}
@@ -167,10 +174,12 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServ
 func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 	// send query to DB
 	str := GetHolesInLogTable(global_uid)
+	log.Printf("Missing Ranges: %v\n", str)
 	if str == "" {
 		return false, fmt.Errorf("[Recovery] failed to get holes.")
 	}
 
+	log.Printf("Peer address to fetch from: %v\n", peer_addr)
 	// dial peer
 	conn, err := grpc.Dial(peer_addr, grpc.WithInsecure())
 	defer conn.Close()
@@ -180,7 +189,7 @@ func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 
 	// creating stream
 	client := pb.NewInternalClient(conn)
-	in := &pb.RecRequest{MissingUIDs: str, Address: peer_addr}
+	in := &pb.RecRequest{MissingUIDs: str, Address: ip_rec_port}
 	stream, err := client.FetchQueries(context.Background(), in)
 	if err != nil {
 		return false, fmt.Errorf("[Recovery] Open stream error for peer %v : %v", peer_addr, err)
@@ -204,7 +213,7 @@ func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 				return
 			}
 			if ApplyQuery(resp.GetQuery()) {
-				log.Printf("[Recovery] failed to apply query %x : ABORTING recovery.", resp.Query)
+				log.Printf("[Recovery] failed to apply query %x : ABORTING recovery.", resp.GetQuery())
 			}
 			fmt.Printf("[Recovery] Replayed query %s -- ", resp.GetQuery())
 		}
@@ -220,13 +229,16 @@ func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 }
 
 func MarkMe(status int32) (int64, error) {
+	log.Printf("MarkMe: Start func\n")
 	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
+	log.Printf("MarkMe: Sending RPC for %v\n", ip_serv_port)
 	resp, err := LB.MarkMe(privateCtx, &pb.MarkStatus{ServerName: ip_serv_port, NewStatus: status})
-	if err != nil {
+	if err != nil || privateCtx.Err() == context.DeadlineExceeded {
 		log.Println("[Recovery] MarkMe failed during recovery!", err)
 		return 0, err
 	}
+	log.Printf("MarkMe: RPC returned %v\n", resp)
 	return resp.GetGlobalUID(), nil
 }
 
@@ -256,6 +268,7 @@ Recovery stage:
 */
 func recoveryStage() {
 
+	fmt.Printf("Rec: Started recovery\n")
 	server_mode = "ZOMBIE"
 
 	// step 1
@@ -264,6 +277,7 @@ func recoveryStage() {
 		log.Println("MarkMe failed so quiting!")
 		return
 	}
+	fmt.Printf("Rec: MarkMe successful %v\n", global_uid)
 
 	// step 2
 	peers, err := FetchAlivePeers()
@@ -271,13 +285,16 @@ func recoveryStage() {
 		log.Println("[Recovery] failed to fetch peers so quiting recovery!")
 		return
 	}
+	log.Printf("Rec: alive peers successful %v\n", peers)
+
 	peer_list := strings.Split(peers, ",")
 	if err != nil {
 		log.Println("[Recovery] Failed to get ALIVE peers or peer list is empty.")
 		return
 	}
 
-	if len(peer_list) == 0 {
+	if len(peers) == 0 {
+		log.Printf("No alive peer\n")
 		server_mode = "ALIVE"
 		if table.LoadKV(db_path, db) {
 			_, err := MarkMe(1)
@@ -286,6 +303,7 @@ func recoveryStage() {
 				return
 			}
 			fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
+			log.Printf("KV Loaded\n")
 			return
 		}
 	}
@@ -302,6 +320,7 @@ func recoveryStage() {
 		// TODO: Add break here when number of holes requested
 		// 		is satisfied - can achieve this with a counter.
 	}
+	log.Printf("Rec: rpcRequestLogs successful %v\n", rec_success)
 
 	if rec_success {
 		// Recovery success
@@ -340,11 +359,11 @@ func main() {
 	ip_addr = os.Args[1]
 	serv_port = os.Args[2]
 	rec_port = os.Args[3]
-	ip_serv_port := ip_addr + ":" + serv_port
-	ip_rec_port := ip_addr + ":" + rec_port
+	ip_serv_port = ip_addr + ":" + serv_port
+	ip_rec_port = ip_addr + ":" + rec_port
 	lb_ip_addr = os.Args[4]
 	lb_port = os.Args[5]
-	ip_lb_port := lb_ip_addr + ":" + lb_port
+	ip_lb_port = lb_ip_addr + ":" + lb_port
 
 	db_path = "/tmp/" + serv_port
 	// If the file doesn't exist, create it or append to the file
@@ -356,7 +375,7 @@ func main() {
 	defer file.Close()
 
 	//Client for LB
-	conn, err := grpc.Dial("127.0.0.1:50050", grpc.WithInsecure())
+	conn, err := grpc.Dial(ip_lb_port, grpc.WithInsecure(), grpc.WithBlock())
 	fmt.Println("ip_lb_port ", ip_lb_port)
 	defer conn.Close()
 	if err != nil {

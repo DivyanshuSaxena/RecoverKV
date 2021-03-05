@@ -39,7 +39,7 @@ peer_list = initially everyone but this can change as client requests.
 // Defines the port to run and total nodes in system
 const (
 	port  = ":50050"
-	nodes = 1
+	nodes = 3
 )
 
 // ServerInstance holds server states
@@ -107,20 +107,9 @@ func CanContactServer(clientID string, serverName string) int {
 	return found
 }
 
-// StartServer startes the server with serverId given
-func StartServer(serverID int) {
-	server := serverList[serverID]
-	tmpList := strings.Split(server.name, ":")
-	ipAddr := tmpList[0]
-	servPort := tmpList[1]
-	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort, "localhost", port[1:], "0")
-	cmd.Stdout = os.Stdout
-	log.Println("Started dead server")
-	err := cmd.Start()
-	if err != nil {
-		log.Fatal(err)
-	}
-
+// Redial redials connection to a dead server
+func Redial(serverID int) {
+	time.Sleep(2 * time.Second)
 	log.Println("Opening new connection")
 	// Update connection
 	conn, err := grpc.Dial(serverList[serverID].name, grpc.WithInsecure())
@@ -130,9 +119,30 @@ func StartServer(serverID int) {
 	defer conn.Close()
 	c := pb.NewInternalClient(conn)
 	serverList[serverID].conn = c
+}
 
+// StartServer startes the server with serverId given
+func StartServer(serverID int) {
 	// Update mode to ZOMBIE
 	serverList[serverID].mode = 0
+
+	server := serverList[serverID]
+	tmpList := strings.Split(server.name, ":")
+	ipAddr := tmpList[0]
+	servPort := tmpList[1]
+
+	// Sleep to allow server exit
+	time.Sleep(time.Second)
+	log.Println(ipAddr, servPort, server.recPort[1:], "localhost", port[1:])
+	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort[1:], "localhost", port[1:], "0")
+	cmd.Stdout = os.Stdout
+	log.Println("Started dead server")
+	err := cmd.Start()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// go Redial(serverID)
 }
 
 func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
@@ -154,44 +164,51 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Permission model error")
 	}
 
-	// Check if client can interact with servers in reachable list
 	blockedPeers := make([]int, 0)
-	for _, reachableName := range reachableList {
-		ret := CanContactServer(clientID, reachableName)
-		if ret != 1 {
-			// COMPLETED: if no, successCode -1
-			log.Printf("Client ID %v cannot interact with this server: %v\n", clientID, reachableName)
-			return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Permission model error")
+	if len(reachable) == 0 {
+		// Set all to be blocked
+		for nameI := range serverNameMap {
+			if nameI != serverName {
+				blockedPeers = append(blockedPeers, serverNameMap[nameI])
+			}
 		}
-		blockedPeers = append(blockedPeers, serverNameMap[reachableName])
+	} else {
+		// Check if client can interact with servers in reachable list
+		for _, reachableName := range reachableList {
+			ret := CanContactServer(clientID, reachableName)
+			if ret != 1 {
+				// COMPLETED: if no, successCode -1
+				log.Printf("Client ID %v cannot interact with this server: %v\n", clientID, reachableName)
+				return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Permission model error")
+			}
+			blockedPeers = append(blockedPeers, serverNameMap[reachableName])
+		}
 	}
 
 	//If yes, Contact server (so that it can heal, if needed) and update its local membership clientMap
-	server := serverList[serverNameMap[serverName]]
+	serverID := serverNameMap[serverName]
 
-	server.lock.Lock()
-	prevBlockedPeers := server.blockedPeers
-	server.blockedPeers = blockedPeers
-	server.lock.Unlock()
+	serverList[serverID].lock.Lock()
+	prevBlockedPeers := serverList[serverID].blockedPeers
+	serverList[serverID].blockedPeers = blockedPeers
+	serverList[serverID].lock.Unlock()
 
 	// Server can heal from only those it is now reachable from
-	if len(reachableList) > 0 {
-
+	if len(reachable) != 0 {
 		serverID := serverNameMap[serverName]
-
 		privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		emptyMsg := new(emptypb.Empty)
+
 		_, err := serverList[serverID].conn.PartitionServer(privateCtx, emptyMsg)
 		// check it it exists, if not successCode = -1
 		if err != nil || privateCtx.Err() == context.DeadlineExceeded {
 			// Revert back to old blocked peers
-			server.lock.Lock()
-			server.blockedPeers = prevBlockedPeers
-			server.lock.Unlock()
+			serverList[serverID].lock.Lock()
+			serverList[serverID].blockedPeers = prevBlockedPeers
+			serverList[serverID].lock.Unlock()
 			return &pb.Response{Value: "", SuccessCode: -1}, errors.New("server cannot be partitioned")
 		}
-
 	}
 
 	// Server Successfully Partitioned
@@ -249,7 +266,7 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 }
 
 func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*pb.Response, error) {
-
+	log.Printf("%v\n", serverList)
 	var successCode int32 = 0
 
 	clientID := in.GetClientID()
@@ -277,11 +294,13 @@ func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*
 		mode := serverList[serverID].mode
 		serverList[serverID].lock.Unlock()
 
+		log.Printf("Mode for server %v is %v %T\n", serverID, mode, mode)
 		if mode == 1 {
 			servers[i] = serverID
 			log.Printf("Server to contact: %v\n", serverName)
 		} else {
 			// On failure with grpc conn, return -1 successcode
+			log.Printf("InitLBState: Sending -1 code\n")
 			return &pb.Response{Value: "", SuccessCode: -1}, nil
 		}
 	}
@@ -329,20 +348,22 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	key := in.GetKey()
 	log.Printf("GetValue Received: %v\n", key)
 
-	maxTries := 10
+	maxTries := 5
 	// In case a server times out, retry connection for maximum maxTries
 	for i := 0; i < maxTries; i++ {
-		i = i + 1
 
 		// Find any alive server
-		serverID := clientData.servers[rand.Intn(nodes)]
+		serverID := clientData.servers[rand.Intn(len(clientData.servers))]
+
 		serverList[serverID].lock.Lock()
 		mode := serverList[serverID].mode
 		serverList[serverID].lock.Unlock()
+		log.Printf("Checking server %v with mode %v %v\n", serverID, mode, serverList[serverID])
 		if mode != 1 {
 			continue
 		}
-		serverToContact := serverList[serverID]
+
+		log.Printf("Found alive server %v at iter %v\n", serverID, i)
 
 		// Send request to the respective server
 		privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -352,14 +373,15 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		resp, err := serverList[serverID].conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
 		if err != nil {
 			statusErr, _ := status.FromError(err)
+			log.Printf("%v %v\n", err, statusErr)
 
 			// If timed out, mark node as DEAD
 			if statusErr.Code() == codes.DeadlineExceeded {
-				log.Printf("Timeout while contacting server %v\n", serverToContact.name)
+				log.Printf("Timeout while contacting server %v\n", serverList[serverID].name)
 
-				serverToContact.lock.Lock()
-				serverToContact.mode = -1
-				serverToContact.lock.Unlock()
+				serverList[serverID].lock.Lock()
+				serverList[serverID].mode = -1
+				serverList[serverID].lock.Unlock()
 
 				StartServer(serverID)
 			}
@@ -370,6 +392,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
 	}
 
+	log.Printf("No successful connection for get could be made\n")
 	// No successful connection could be made
 	return &pb.Response{Value: "", SuccessCode: -1}, errors.New("operation failed")
 }
@@ -401,6 +424,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	// Count number of successful writes
 	successfulPuts := 0
 
+	log.Printf("%v In SetValue, server list: %v", time.Now().Unix(), serverList)
 	for serverID, server := range serverList {
 		if server.mode != -1 {
 			// Send request to the respective server
@@ -409,16 +433,18 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 			// If connection did not time out, proceed with the request
 			resp, err := server.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
+			log.Printf("%v Post RPC", time.Now().Unix())
 			if err != nil {
+				log.Printf("error while contacting %v: %v\n", server.name, err)
 				statusErr, _ := status.FromError(err)
 
 				// If timed out, mark node as DEAD
 				if statusErr.Code() == codes.DeadlineExceeded {
 					log.Printf("Timeout while contacting server %v\n", server.name)
 
-					server.lock.Lock()
-					server.mode = -1
-					server.lock.Unlock()
+					serverList[serverID].lock.Lock()
+					serverList[serverID].mode = -1
+					serverList[serverID].lock.Unlock()
 
 					StartServer(serverID)
 				}
@@ -452,17 +478,21 @@ func (lb *loadBalancerInternal) MarkMe(ctx context.Context, in *pb.MarkStatus) (
 	serverName := in.GetServerName()
 	updatedStatus := in.GetNewStatus()
 
+	log.Printf("MarkMe: name %v\n", serverName)
 	// Update status in global map
-	server := serverList[serverNameMap[serverName]]
+	serverID := serverNameMap[serverName]
 
-	server.lock.Lock()
-	server.mode = updatedStatus
-	server.lock.Unlock()
+	log.Printf("MarkMe: Reached LB\n")
+	serverList[serverID].lock.Lock()
+	serverList[serverID].mode = updatedStatus
+	log.Printf("Marked server %v as %v\n", serverID, updatedStatus)
+	serverList[serverID].lock.Unlock()
 
 	// Send the current max global ID back to the server
 	queryIDMu.Lock()
 	globalUID := queryID
 	queryIDMu.Unlock()
+	log.Printf("%v\n", serverList)
 
 	return &pb.Ack{GlobalUID: globalUID}, nil
 }
@@ -511,6 +541,7 @@ func main() {
 	////////////////////////////////////////////////////
 
 	// Set up distinct connections to the servers.
+	log.Printf("Num nodes: %v\n", nodes)
 	for i := 0; i < nodes; i++ {
 		// TODO: Should we run servers as entirely different processes?
 		name := "localhost" + address[i]
@@ -527,7 +558,7 @@ func main() {
 		defer conn.Close()
 		c := pb.NewInternalClient(conn)
 		log.Printf("Added server id %v\n", i)
-		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 1, lock: sync.Mutex{}}
+		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
 		serverList[i] = s
 	}
 
