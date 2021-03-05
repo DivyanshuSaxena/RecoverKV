@@ -7,7 +7,7 @@
 
 using namespace std;
 
-#define TOTAL_TESTS 5
+#define TOTAL_TESTS 6
 #define KEY_SIZE 50
 #define VALUE_SIZE 100
 #define MAX_PARTITION_TRIES 1000
@@ -212,8 +212,9 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
         cout << "Failed to send kill request to " << server_name << " in TEST 4" << endl;
         return 0;
     }
+
     // Ideally, we should not have to wait for any command
-    sleep(10);
+    sleep(SLEEP_INTERVAL);
 
     // send read request to server
     for (int i = 0; i < total_requests; i++)
@@ -369,15 +370,15 @@ int main(int argc, char *argv[])
     int tests_passed = 0;
 
     // sanity check for writes and reads
-    // tests_passed += test_correctness_single_write_and_read(client, 1000);
+    tests_passed += test_correctness_single_write_and_read(client, 1000);
     cout << "-----------------------------------------" << endl;
 
     // multiple overallaping writes followed by reads
-    // tests_passed += test_correctness_write_intensive(client, 1000, 3);
+    tests_passed += test_correctness_write_intensive(client, 1000, 3);
     cout << "-----------------------------------------" << endl;
 
     // single writes followed by multiple reads
-    // tests_passed += test_correctness_read_intensive(client, 1000, 3);
+    tests_passed += test_correctness_read_intensive(client, 1000, 3);
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability
@@ -385,7 +386,10 @@ int main(int argc, char *argv[])
     cout << "-----------------------------------------" << endl;
 
     // check for non-existent keys
-    // tests_passed += test_correctness_key_existance(client);
+    tests_passed += test_correctness_key_existance(client);
+    cout << "-----------------------------------------" << endl;
+
+    tests_passed += test_correctness_partition(cleint);
     cout << "-----------------------------------------" << endl;
 
     // free state and disconnect from server
@@ -400,6 +404,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < argc; i++)
     	delete serverNames[i];
     delete serverNames;
+    delete client;
 
     return 0;
 }

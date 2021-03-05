@@ -39,7 +39,7 @@ peer_list = initially everyone but this can change as client requests.
 // Defines the port to run and total nodes in system
 const (
 	port  = ":50050"
-	nodes = 1
+	nodes = 3
 )
 
 // ServerInstance holds server states

@@ -356,8 +356,7 @@ func main() {
 	defer file.Close()
 
 	//Client for LB
-	conn, err := grpc.Dial("127.0.0.1:50050", grpc.WithInsecure())
-	fmt.Println("ip_lb_port ", ip_lb_port)
+	conn, err := grpc.Dial(ip_lb_port, grpc.WithInsecure())
 	defer conn.Close()
 	if err != nil {
 		log.Fatalf("[Load balancer] Failed to connect with peer %v : %v", ip_lb_port, err)
