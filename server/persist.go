@@ -210,11 +210,11 @@ func FetchMaxLocalUID() int64 {
 }
 
 // TODO: Check the holes-finding-SQL query here
-func GetHolesInLogTable(global_uid int64) string {
+func GetHolesInLogTable(global_uid int64) (string, error){
 
 	// if first time, then just return
 	if global_uid == 0 {
-		return "none"
+		return "",nil
 	}
 
 	// find holes in log table (not data table)
@@ -228,7 +228,7 @@ func GetHolesInLogTable(global_uid int64) string {
 	rows, err := db.Query(query)
 	if checkErr(err) {
 		log.Println("[Recovery] Finding gaps in log table failed")
-		return ""
+		return "",err
 	}
 
 	ret_str := ""
@@ -245,13 +245,16 @@ func GetHolesInLogTable(global_uid int64) string {
 			ret_str += ("|" + least_prs_id + "-" + max_prs_id)
 		}
 	}
-	// This is to ensure there aren't any trailing holes upto global UID.
-	if ret_str == "" {
-		return fmt.Sprintf("%d-%d", FetchMaxLocalUID(), global_uid)
+	localMaxlUID := FetchMaxLocalUID()
+	// if global already equal to local then send empty string
+	if localMaxlUID != global_uid {
+		// This is to ensure there aren't any trailing holes upto global UID.
+		if ret_str == "" {
+			return fmt.Sprintf("%d-%d", localMaxlUID, global_uid),nil
+		}
+		ret_str += fmt.Sprintf("|%d-%d", localMaxlUID, global_uid)
 	}
-	ret_str += fmt.Sprintf("|%d-%d", FetchMaxLocalUID(), global_uid)
-	return ret_str
-}
+	return ret_str,nil
 
 // TODO: Check the peer-find-relevant-qids query here
 func GetMissingQueriesForPeer(start string, end string) *sql.Rows {

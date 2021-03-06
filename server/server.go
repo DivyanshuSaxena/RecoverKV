@@ -173,16 +173,17 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServ
 
 func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 	// send query to DB
-	str := GetHolesInLogTable(global_uid)
+	str,err := GetHolesInLogTable(global_uid)
 	log.Printf("Missing Ranges: %v\n", str)
 
-	// first time start-up
-	if str == "none" {
-		return true, nil
+	// Query failed
+	if err != nil {
+		return false, err
 	}
-
+	
+	// first time start-up or when local max is equal to global max (indicating no holes)
 	if str == "" {
-		return false, fmt.Errorf("[Recovery] failed to get holes.")
+		return true, nil
 	}
 
 	log.Printf("Peer address to fetch from: %v\n", peer_addr)
