@@ -217,10 +217,11 @@ func GetHolesInLogTable(global_uid int64) string {
 		return "none"
 	}
 
+	// find holes in log table (not data table)
 	query := `
 	SELECT a AS id, b AS next_id FROM (
 		SELECT a1.uid AS a , MIN(a2.uid) AS b
-		FROM store AS a1 LEFT JOIN store AS a2
+		FROM log AS a1 LEFT JOIN log AS a2
 			ON a2.uid > a1.uid
 		GROUP BY a1.uid) AS tab
 	WHERE b > a + 1`
