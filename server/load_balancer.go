@@ -120,7 +120,6 @@ func Redial(serverID int) {
 
 // StartServer startes the server with serverId given
 func StartServer(serverID int) {
-
 	server := serverList[serverID]
 	tmpList := strings.Split(server.name, ":")
 	ipAddr := tmpList[0]
@@ -137,11 +136,11 @@ func StartServer(serverID int) {
 	}
 
 	// Update mode to ZOMBIE
-	serverList[serverID].lock.Lock()
-	serverList[serverID].mode = 0
-	serverList[serverID].lock.Unlock()
+	// serverList[serverID].lock.Lock()
+	// serverList[serverID].mode = 0
+	// serverList[serverID].lock.Unlock()
 
-	//Redial(serverID)
+	Redial(serverID)
 }
 
 func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
@@ -480,6 +479,20 @@ func (lb *loadBalancerInternal) MarkMe(ctx context.Context, in *pb.MarkStatus) (
 	log.Printf("MarkMe: name %v\n", serverName)
 	// Update status in global map
 	serverID := serverNameMap[serverName]
+
+	// Check if the gRPC connection is healed or not
+	emptyMsg := new(emptypb.Empty)
+	flag := false
+	log.Println("Blocking MarkMe")
+	for !flag {
+		_, err := serverList[serverID].conn.PingServer(context.Background(), emptyMsg)
+		if err != nil {
+		} else {
+			flag = true
+			break
+		}
+	}
+	log.Println("MarkMe unblocked")
 
 	log.Printf("MarkMe: Reached LB\n")
 	serverList[serverID].lock.Lock()

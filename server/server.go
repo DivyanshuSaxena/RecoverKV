@@ -113,6 +113,10 @@ func (s *server) StopServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Em
 	return new(emptypb.Empty), nil
 }
 
+func (s *server) PingServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Empty, error) {
+	return new(emptypb.Empty), nil
+}
+
 func (s *server) PartitionServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Empty, error) {
 
 	// On partition healing fetch data that is not there.
@@ -171,16 +175,16 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServ
 	return nil
 }
 
-func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
+func rpcRequestLogs(peer_addr string, global_uid int64, max_local_uid int64) (bool, error) {
 	// send query to DB
-	str,err := GetHolesInLogTable(global_uid)
+	str, err := GetHolesInLogTable(global_uid, max_local_uid)
 	log.Printf("Missing Ranges: %v\n", str)
 
 	// Query failed
 	if err != nil {
 		return false, err
 	}
-	
+
 	// first time start-up or when local max is equal to global max (indicating no holes)
 	if str == "" {
 		return true, nil
@@ -222,7 +226,7 @@ func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 			if err := ApplyQuery(resp.GetQuery()); err != nil {
 				log.Printf("[Recovery] failed to apply query %s : ABORTING recovery.", resp.GetQuery())
 			}
-			fmt.Printf("[Recovery] Replayed query %s -- ", resp.GetQuery())
+			// fmt.Printf("[Recovery] Replayed query %s -- ", resp.GetQuery())
 		}
 	}()
 
@@ -237,7 +241,8 @@ func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 
 func MarkMe(status int32) (int64, error) {
 	log.Printf("MarkMe: Start func\n")
-	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	// Since MarkMe gets blocked at the load balancer until recovery is complete -- set a high timeout
+	privateCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	log.Printf("MarkMe: Sending RPC for %v\n", ip_serv_port)
 	resp, err := LB.MarkMe(privateCtx, &pb.MarkStatus{ServerName: ip_serv_port, NewStatus: status})
@@ -277,6 +282,9 @@ func recoveryStage() {
 
 	fmt.Printf("Rec: Started recovery\n")
 	server_mode = "ZOMBIE"
+
+	// Register the max local uid before going into Zombie state
+	max_local_uid := FetchMaxLocalUID()
 
 	// step 1
 	global_uid, err := MarkMe(0)
@@ -322,7 +330,7 @@ func recoveryStage() {
 	// Make this seq?
 	var rec_success bool
 	for _, peer := range peer_list {
-		rec_success, err = rpcRequestLogs(peer, global_uid)
+		rec_success, err = rpcRequestLogs(peer, global_uid, max_local_uid)
 		// Done processing all queries, so mark completion
 		// TODO: Add break here when number of holes requested
 		// 		is satisfied - can achieve this with a counter.
@@ -392,38 +400,39 @@ func main() {
 	LB = pb.NewInternalClient(conn)
 
 	// Start the server and listen for requests
-	lis, err := net.Listen("tcp", ip_serv_port)
+	serv_lis, err := net.Listen("tcp", ip_serv_port)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
-	lis2, err := net.Listen("tcp", ip_rec_port)
+	rec_lis, err := net.Listen("tcp", ip_rec_port)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
 
 	// Main LB facing server
-	s := grpc.NewServer()
-	pb.RegisterInternalServer(s, &server{})
-	s2 := grpc.NewServer()
-	pb.RegisterInternalServer(s2, &server{})
+	serv_s := grpc.NewServer()
+	pb.RegisterInternalServer(serv_s, &server{})
+	rec_s := grpc.NewServer()
+	pb.RegisterInternalServer(rec_s, &server{})
 
 	var ret bool
 	db, ret = InitDB(db_path)
 	if ret {
 
 		PrintStartMsg()
-		// Serving recovery stage
 		go func() {
-
-			if err := s.Serve(lis); err != nil {
-				log.Fatalf("Failed to serve recover: %v\n", err)
+			// Serving GET/PUT
+			log.Printf("Starting Server on serv port\n")
+			if err := serv_s.Serve(serv_lis); err != nil {
+				log.Fatalf("Failed to serve GET/PUT: %v\n", err)
 			}
 		}()
 
+		// Serving recovery stage
 		go recoveryStage()
-		// Serving GET/PUT
-		if err := s2.Serve(lis2); err != nil {
-			log.Fatalf("Failed to serve GET/PUT: %v\n", err)
+		log.Printf("Starting Server on rec port\n")
+		if err := rec_s.Serve(rec_lis); err != nil {
+			log.Fatalf("Failed to serve recover: %v\n", err)
 		}
 		// Recovery stage
 

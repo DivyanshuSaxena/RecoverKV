@@ -48,6 +48,9 @@ service Internal {
 
     // Fetch Alive peers of a server
     rpc fetchAlivePeers (ServerInfo) returns (AlivePeersResponse) {}
+
+    // Ping the server to check if the gRPC connection is alive
+    rpc pingServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
 
 // The request message containing key

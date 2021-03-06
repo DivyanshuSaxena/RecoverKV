@@ -440,7 +440,7 @@ int main(int argc, char *argv[])
     // intialize connection to server
     if (client->kv739_init(serverNames) == -1)
     {
-    		cout << "Failed to init client" << endl;
+        cout << "Failed to init client" << endl;
         return 0;
     }
 
@@ -449,19 +449,19 @@ int main(int argc, char *argv[])
     int tests_passed = 0;
 
     // sanity check for writes and reads
-    // tests_passed += test_correctness_single_write_and_read(client, 100);
+    // tests_passed += test_correctness_single_write_and_read(client, 1000);
     cout << "-----------------------------------------" << endl;
 
     // multiple overallaping writes followed by reads
-    // tests_passed += test_correctness_write_intensive(client, 100, 3);
+    // tests_passed += test_correctness_write_intensive(client, 1000, 3);
     cout << "-----------------------------------------" << endl;
 
     // single writes followed by multiple reads
-    // tests_passed += test_correctness_read_intensive(client, 100, 3);
+    // tests_passed += test_correctness_read_intensive(client, 1000, 3);
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability
-    // tests_passed += test_correctness_durability(client, serverNames[0], 100);
+    // tests_passed += test_correctness_durability(client, serverNames[0], 1000);
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability
@@ -472,7 +472,7 @@ int main(int argc, char *argv[])
     // tests_passed += test_correctness_key_existance(client);
     cout << "-----------------------------------------" << endl;
 
-    // tests_passed += test_correctness_partition(client);
+    tests_passed += test_correctness_partition(client, &serverNames[0]);
     cout << "-----------------------------------------" << endl;
 
     // free state and disconnect from server
@@ -487,7 +487,6 @@ int main(int argc, char *argv[])
     for (int i = 0; i < argc; i++)
     	delete serverNames[i];
     delete serverNames;
-    delete client;
 
     return 0;
 }
