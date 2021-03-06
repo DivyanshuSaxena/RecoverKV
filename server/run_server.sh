@@ -12,5 +12,7 @@
 if [[ $6 -gt 0 ]]; then
   rm -f -- server$2.log
   rm -f -- /tmp/$2
+  rm -f -- /tmp/$2-wal
+  rm -f -- /tmp/$2-shm
 fi
 ./recoverKV $1 $2 $3 $4 $5

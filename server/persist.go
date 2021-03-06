@@ -254,7 +254,8 @@ func GetHolesInLogTable(global_uid int64) string {
 
 // TODO: Check the peer-find-relevant-qids query here
 func GetMissingQueriesForPeer(start string, end string) *sql.Rows {
-	rows, err := db.Query("SELECT query FROM log WHERE uid>? AND uid<?", start, end)
+	// be inclusive
+	rows, err := db.Query("SELECT query FROM log WHERE uid >=? AND uid <= ?", start, end)
 	if checkErr(err) {
 		log.Println("[Recovery] Finding gaps in log table failed")
 		return nil
