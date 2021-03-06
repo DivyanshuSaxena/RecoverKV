@@ -363,20 +363,16 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 		log.Printf("Found alive server %v at iter %v\n", serverID, i)
 
-		// Send request to the respective server
-		privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
 		// ServerInstance.conn is Read only -- no lock needed for safety
-		resp, err := serverList[serverID].conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
+		resp, err := serverList[serverID].conn.GetValue(context.Background(), &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
 		if err != nil {
 			log.Printf("error while contacting %v: %v\n", serverList[serverID].name, err)
 			statusErr, _ := status.FromError(err)
 			log.Printf("%v %v\n", err, statusErr)
 
 			// If timed out, mark node as DEAD
-			if statusErr.Code() == codes.DeadlineExceeded {
-				log.Printf("Timeout while contacting server %v\n", serverList[serverID].name)
+			if statusErr.Code() == codes.Unavailable {
+				log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].name)
 
 				serverList[serverID].lock.Lock()
 				serverList[serverID].mode = -1
@@ -424,21 +420,17 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	successfulPuts := 0
 
 	log.Printf("%v In SetValue, server list: %v", time.Now().Unix(), serverList)
-	for serverID, _ := range serverList {
+	for serverID := range serverList {
 		if serverList[serverID].mode != -1 {
-			// Send request to the respective server
-			privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-			defer cancel()
-
-			// If connection did not time out, proceed with the request
-			resp, err := serverList[serverID].conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
+			// Send request to the respective server. If connection unavailable, start server
+			resp, err := serverList[serverID].conn.SetValue(context.Background(), &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
 			if err != nil {
-				log.Printf("error while contacting %v: %v\n", serverList[serverID].name, err)
 				statusErr, _ := status.FromError(err)
+				log.Printf("error while contacting %v: %v || Code: %v\n", serverList[serverID].name, err, statusErr.Code())
 
 				// If timed out, mark node as DEAD
-				if statusErr.Code() == codes.DeadlineExceeded {
-					log.Printf("Timeout while contacting server %v\n", serverList[serverID].name)
+				if statusErr.Code() == codes.Unavailable {
+					log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].name)
 
 					serverList[serverID].lock.Lock()
 					serverList[serverID].mode = -1
@@ -446,7 +438,6 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 					go StartServer(serverID)
 				}
-				// TODO: Restart the server by executing a shell script
 			} else {
 				// COMPLETED: Do something if inconsistent values read from different servers
 				// log.Printf("Put succeeded with resp: %v\n", resp)

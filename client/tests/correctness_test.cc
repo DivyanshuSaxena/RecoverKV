@@ -7,7 +7,7 @@
 
 using namespace std;
 
-#define TOTAL_TESTS 6
+#define TOTAL_TESTS 7
 #define KEY_SIZE 50
 #define VALUE_SIZE 100
 #define MAX_PARTITION_TRIES 1000
@@ -243,7 +243,7 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
 }
 
 // RECOVERY TEST
-int test_correctness_recovery(KV739Client *client, char *server_name, int total_requests)
+int test_correctness_recovery(KV739Client *client, char *server_name, int total_requests, int clean)
 {
     // get process id
     pid_t processID = getpid();
@@ -259,7 +259,7 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
     }
 
     // send write requests to server
-    for (int i = 0; i < total_requests / 2; i++)
+    for (int i = 0; i < total_requests / 4; i++)
     {
         int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
         if (res	== -1 || res == -2)
@@ -270,7 +270,7 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
     }
 
     cout << "TEST 4 [Killed server " << server_name << " please restart it.] " << endl;
-    if (client->kv739_die(server_name, 1) == -1)
+    if (client->kv739_die(server_name, clean) == -1)
     {
         cout << "Failed to send kill request to " << server_name << " in TEST 4" << endl;
         return 0;
@@ -281,7 +281,7 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
     // sleep(2);
 
     // send write requests to server -- again
-    for (int i = total_requests / 2; i < total_requests; i++)
+    for (int i = total_requests / 4; i < total_requests; i++)
     {
         int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
         if (res	== -1 || res == -2)
@@ -466,15 +466,19 @@ int main(int argc, char *argv[])
     // tests_passed += test_correctness_durability(client, serverNames[0], 1000);
     cout << "-----------------------------------------" << endl;
 
-    // check server failure and data durability
-    // tests_passed += test_correctness_recovery(client, serverNames[0], 1000);
+    // check server failure and data durability -- clean stop
+    tests_passed += test_correctness_recovery(client, serverNames[0], 1000, 1);
+    cout << "-----------------------------------------" << endl;
+
+    // check server failure and data durability -- unclean stop
+    tests_passed += test_correctness_recovery(client, serverNames[0], 1000, 0);
     cout << "-----------------------------------------" << endl;
 
     // check for non-existent keys
     // tests_passed += test_correctness_key_existance(client);
     cout << "-----------------------------------------" << endl;
 
-    tests_passed += test_correctness_partition(client, &serverNames[0]);
+    // tests_passed += test_correctness_partition(client, &serverNames[0]);
     cout << "-----------------------------------------" << endl;
 
     // free state and disconnect from server
