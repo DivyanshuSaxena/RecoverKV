@@ -109,22 +109,17 @@ func CanContactServer(clientID string, serverName string) int {
 
 // Redial redials connection to a dead server
 func Redial(serverID int) {
-	time.Sleep(2 * time.Second)
-	log.Println("Opening new connection")
+	log.Println("Opening new connection: ", serverList[serverID].name)
 	// Update connection
-	conn, err := grpc.Dial(serverList[serverID].name, grpc.WithInsecure())
+	conn, err := grpc.Dial(serverList[serverID].name, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v\n", err)
 	}
-	defer conn.Close()
-	c := pb.NewInternalClient(conn)
-	serverList[serverID].conn = c
+	serverList[serverID].conn = pb.NewInternalClient(conn)
 }
 
 // StartServer startes the server with serverId given
 func StartServer(serverID int) {
-	// Update mode to ZOMBIE
-	serverList[serverID].mode = 0
 
 	server := serverList[serverID]
 	tmpList := strings.Split(server.name, ":")
@@ -133,7 +128,6 @@ func StartServer(serverID int) {
 
 	// Sleep to allow server exit
 	time.Sleep(time.Second)
-	log.Println(ipAddr, servPort, server.recPort[1:], "localhost", port[1:])
 	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort[1:], "localhost", port[1:], "0")
 	cmd.Stdout = os.Stdout
 	log.Println("Started dead server")
@@ -142,7 +136,12 @@ func StartServer(serverID int) {
 		log.Fatal(err)
 	}
 
-	// go Redial(serverID)
+	// Update mode to ZOMBIE
+	serverList[serverID].lock.Lock()
+	serverList[serverID].mode = 0
+	serverList[serverID].lock.Unlock()
+
+	//Redial(serverID)
 }
 
 func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
@@ -258,7 +257,7 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 		serverList[serverID].mode = -1
 		serverList[serverID].lock.Unlock()
 
-		StartServer(serverID)
+		go StartServer(serverID)
 	}
 
 	// Server Successfully shutdown
@@ -358,7 +357,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		serverList[serverID].lock.Lock()
 		mode := serverList[serverID].mode
 		serverList[serverID].lock.Unlock()
-		log.Printf("Checking server %v with mode %v %v\n", serverID, mode, serverList[serverID])
+
 		if mode != 1 {
 			continue
 		}
@@ -372,6 +371,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		// ServerInstance.conn is Read only -- no lock needed for safety
 		resp, err := serverList[serverID].conn.GetValue(privateCtx, &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
 		if err != nil {
+			log.Printf("error while contacting %v: %v\n", serverList[serverID].name, err)
 			statusErr, _ := status.FromError(err)
 			log.Printf("%v %v\n", err, statusErr)
 
@@ -383,12 +383,12 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 				serverList[serverID].mode = -1
 				serverList[serverID].lock.Unlock()
 
-				StartServer(serverID)
+				go StartServer(serverID)
 			}
-			// TODO: Restart the server by executing a shell script
 			continue
 		}
 
+		log.Println("GetValue Response: ", resp.GetValue())
 		return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
 	}
 
@@ -425,28 +425,27 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	successfulPuts := 0
 
 	log.Printf("%v In SetValue, server list: %v", time.Now().Unix(), serverList)
-	for serverID, server := range serverList {
-		if server.mode != -1 {
+	for serverID, _ := range serverList {
+		if serverList[serverID].mode != -1 {
 			// Send request to the respective server
 			privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
 
 			// If connection did not time out, proceed with the request
-			resp, err := server.conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
-			log.Printf("%v Post RPC", time.Now().Unix())
+			resp, err := serverList[serverID].conn.SetValue(privateCtx, &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
 			if err != nil {
-				log.Printf("error while contacting %v: %v\n", server.name, err)
+				log.Printf("error while contacting %v: %v\n", serverList[serverID].name, err)
 				statusErr, _ := status.FromError(err)
 
 				// If timed out, mark node as DEAD
 				if statusErr.Code() == codes.DeadlineExceeded {
-					log.Printf("Timeout while contacting server %v\n", server.name)
+					log.Printf("Timeout while contacting server %v\n", serverList[serverID].name)
 
 					serverList[serverID].lock.Lock()
 					serverList[serverID].mode = -1
 					serverList[serverID].lock.Unlock()
 
-					StartServer(serverID)
+					go StartServer(serverID)
 				}
 				// TODO: Restart the server by executing a shell script
 			} else {
@@ -454,7 +453,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 				// log.Printf("Put succeeded with resp: %v\n", resp)
 				// Inconsistency can be caused due to recovering nodes. Hence, return the value of an ALIVE node
 				// Currently, server does not fetch the uid from the data table
-				if server.mode == 1 {
+				if serverList[serverID].mode == 1 {
 					// TODO: How should we evaluate successful puts? In case of recovering and alive nodes
 					successfulPuts = successfulPuts + 1
 					val = resp.GetValue()

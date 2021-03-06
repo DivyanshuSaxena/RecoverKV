@@ -292,8 +292,8 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
     }
 
     // Ideally, we should not have to wait for any command
-    cout << "Waiting for 4 secs server to recover" << endl;
-    sleep(4);
+    cout << "Waiting for 5 secs server to recover" << endl;
+    sleep(5);
 
     // send read request to server
     for (int i = 0; i < total_requests; i++)
@@ -465,7 +465,7 @@ int main(int argc, char *argv[])
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability
-    tests_passed += test_correctness_recovery(client, serverNames[0], 200);
+    tests_passed += test_correctness_recovery(client, serverNames[0], 1000);
     cout << "-----------------------------------------" << endl;
 
     // check for non-existent keys

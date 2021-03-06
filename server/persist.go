@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -151,11 +152,21 @@ func checkErr(err error) bool {
 	return false
 }
 
+func trimQuotes(s string) string {
+	if len(s) >= 2 {
+		if c := s[len(s)-1]; s[0] == c && (c == '"' || c == '\'') {
+			return s[1 : len(s)-1]
+		}
+	}
+	return s
+}
+
 // Apply a given query if it's latest for the key.
 // return false only if failed applying.
-func ApplyQuery(query string) bool {
+func ApplyQuery(query string) error {
 	//fetch the uid of the query,
 	tmp := strings.SplitN(query, " ", -1)
+
 	// Get last element and remove '(),' from it.
 	var re = regexp.MustCompile(`(^\(|\)|,)`)
 	quidStr, _ := strconv.Atoi(re.ReplaceAllString(tmp[len(tmp)-1], ""))
@@ -163,25 +174,31 @@ func ApplyQuery(query string) bool {
 	qval := re.ReplaceAllString(tmp[len(tmp)-2], "")
 	qkey := re.ReplaceAllString(tmp[len(tmp)-3], "")
 
+	qval = trimQuotes(qval)
+	qkey = trimQuotes(qkey)
+
 	// check with db and see if quid is larger,
-	row := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", qkey, quid)
+	row := db.QueryRow("SELECT key FROM store WHERE key=? AND uid > ?", qkey, quid)
 	var tmpkey string
-	row.Scan(&tmpkey)
-	if tmpkey == "" {
+	err := row.Scan(&tmpkey)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if tmpkey == "" || err == sql.ErrNoRows {
+
 		// if either key does not exist or uid < quid, so need to update db and push to log.
 		// Just invoke updateKey for now.
 		if UpdateKey(qkey, qval, quid, db) {
-			return true
+			return nil
 		}
-		return false
+
+		return errors.New("ApplyQuery: Failed to update key")
 		// ADDON: This could be improved by applying the query directly
 	} else {
 		// uid > quid means key in db is latest so don't apply query.
-		return true
+		return nil
 	}
-	return false
-
-	//TODO: Add logs to this function
+	return errors.New("ApplyQuery: Failed to update key")
 }
 
 func FetchMaxLocalUID() int64 {
@@ -194,6 +211,12 @@ func FetchMaxLocalUID() int64 {
 
 // TODO: Check the holes-finding-SQL query here
 func GetHolesInLogTable(global_uid int64) string {
+
+	// if first time, then just return
+	if global_uid == 0 {
+		return "none"
+	}
+
 	query := `
 	SELECT a AS id, b AS next_id FROM (
 		SELECT a1.uid AS a , MIN(a2.uid) AS b

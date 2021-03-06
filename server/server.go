@@ -175,6 +175,12 @@ func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 	// send query to DB
 	str := GetHolesInLogTable(global_uid)
 	log.Printf("Missing Ranges: %v\n", str)
+
+	// first time start-up
+	if str == "none" {
+		return true, nil
+	}
+
 	if str == "" {
 		return false, fmt.Errorf("[Recovery] failed to get holes.")
 	}
@@ -212,8 +218,8 @@ func rpcRequestLogs(peer_addr string, global_uid int64) (bool, error) {
 				log.Printf("[Recovery] Buddy server has an error.")
 				return
 			}
-			if ApplyQuery(resp.GetQuery()) {
-				log.Printf("[Recovery] failed to apply query %x : ABORTING recovery.", resp.GetQuery())
+			if err := ApplyQuery(resp.GetQuery()); err != nil {
+				log.Printf("[Recovery] failed to apply query %s : ABORTING recovery.", resp.GetQuery())
 			}
 			fmt.Printf("[Recovery] Replayed query %s -- ", resp.GetQuery())
 		}
@@ -335,6 +341,7 @@ func recoveryStage() {
 				return
 			}
 			fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
+			log.Printf("KV Loaded\n")
 			return
 		} else {
 			fmt.Println("Loading to memory failed == Failing server...bye.")
@@ -389,25 +396,32 @@ func main() {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
 	lis2, err := net.Listen("tcp", ip_rec_port)
+	if err != nil {
+		log.Fatalf("Failed to listen: %v\n", err)
+	}
+
 	// Main LB facing server
 	s := grpc.NewServer()
+	pb.RegisterInternalServer(s, &server{})
 	s2 := grpc.NewServer()
+	pb.RegisterInternalServer(s2, &server{})
 
 	var ret bool
 	db, ret = InitDB(db_path)
 	if ret {
-		go recoveryStage()
+
 		PrintStartMsg()
 		// Serving recovery stage
 		go func() {
-			pb.RegisterInternalServer(s2, &server{})
-			if err := s2.Serve(lis2); err != nil {
+
+			if err := s.Serve(lis); err != nil {
 				log.Fatalf("Failed to serve recover: %v\n", err)
 			}
 		}()
+
+		go recoveryStage()
 		// Serving GET/PUT
-		pb.RegisterInternalServer(s, &server{})
-		if err := s.Serve(lis); err != nil {
+		if err := s2.Serve(lis2); err != nil {
 			log.Fatalf("Failed to serve GET/PUT: %v\n", err)
 		}
 		// Recovery stage
