@@ -220,6 +220,11 @@ func GetHolesInLogTable(global_uid int64, max_local_uid int64) (string, error) {
 		return "", nil
 	}
 
+	// If local uid = global uid, simply return. No need for db queries
+	if max_local_uid == global_uid {
+		return "", nil
+	}
+
 	// find holes in log table (not data table)
 	query := `
 	SELECT a AS id, b AS next_id FROM (
