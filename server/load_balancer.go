@@ -171,6 +171,7 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 		}
 	} else {
 		// Check if client can interact with servers in reachable list
+		reachableMap := make(map[string]struct{}, len(reachableList))
 		for _, reachableName := range reachableList {
 			ret := CanContactServer(clientID, reachableName)
 			if ret != 1 {
@@ -178,7 +179,14 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 				log.Printf("Client ID %v cannot interact with this server: %v\n", clientID, reachableName)
 				return &pb.Response{Value: "", SuccessCode: -1}, errors.New("Permission model error")
 			}
-			blockedPeers = append(blockedPeers, serverNameMap[reachableName])
+			reachableMap[reachableName] = struct{}{}
+		}
+
+		// add blocked peers
+		for nameI := range serverNameMap {
+			if _, prs := reachableMap[nameI]; !prs {
+				blockedPeers = append(blockedPeers, serverNameMap[nameI])
+			}
 		}
 	}
 

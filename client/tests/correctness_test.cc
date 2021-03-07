@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 #include <iostream>
 
@@ -7,14 +8,14 @@
 
 using namespace std;
 
-#define TOTAL_TESTS 8
+#define SLEEP_INTERVAL 5
+
 #define KEY_SIZE 50
 #define VALUE_SIZE 100
 #define MAX_PARTITION_TRIES 1000
 
-#define SLEEP_INTERVAL 5
-
 int test_num = 0;
+int total_servers = 0;
 
 // SINGLE WRITE CYCLE FOLLOWED BY READS
 int test_correctness_single_write_and_read(KV739Client *client,
@@ -186,11 +187,15 @@ int test_correctness_read_intensive(KV739Client *client, int total_requests,
 }
 
 // DURABILITY TEST
-int test_correctness_durability(KV739Client *client, char *server_name, int total_requests)
+int test_correctness_durability(KV739Client *client, char **serverNames, int total_requests)
 {
     test_num++;
+
     // get process id
     pid_t processID = getpid();
+
+    // server to kill
+    char *server_name = serverNames[rand() % total_servers];
 
     // generate key/value pairs
     char keys[total_requests][KEY_SIZE] = {0};
@@ -236,7 +241,7 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
         if (strcmp(newValues[i], oldValues[i]) != 0)
         {
             cout << "TEST " << test_num << " FAILED: Case " << i << " Expected " << newValues[i]
-                 << ", Got " << oldValues[i] << "for key " << keys[i] << endl;
+                 << ", Got " << oldValues[i] << " for key " << keys[i] << endl;
             return 0;
         }
     }
@@ -247,11 +252,15 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
 }
 
 // RECOVERY TEST
-int test_correctness_recovery(KV739Client *client, char *server_name, int total_requests, int clean)
+int test_correctness_recovery(KV739Client *client, char **serverNames, int total_requests, int clean)
 {
     test_num++;
+
     // get process id
     pid_t processID = getpid();
+
+    // server to kill
+    char *server_name = serverNames[rand() % total_servers];
 
     // generate key/value pairs
     char keys[total_requests][KEY_SIZE] = {0};
@@ -293,7 +302,7 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
     }
 
     // Ideally, we should not have to wait for any command
-    cout << "Waiting for 5 secs server to recover" << endl;
+    cout << "Waiting for " << SLEEP_INTERVAL << " secs server to recover" << endl;
     sleep(SLEEP_INTERVAL);
 
     // send read request to server
@@ -312,7 +321,7 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
         if (strcmp(newValues[i], oldValues[i]) != 0)
         {
             cout << "TEST " << test_num << " FAILED: Case " << i << " Expected " << newValues[i]
-                 << ", Got " << oldValues[i] << "for key " << keys[i] << endl;
+                 << ", Got " << oldValues[i] << " for key " << keys[i] << endl;
             return 0;
         }
     }
@@ -376,9 +385,10 @@ int test_correctness_partition(KV739Client *client, char **serverNames)
     }
 
     // Kill a server (cleanly)
+    cout << "TEST " << test_num << " Killed server " << serverNames[0] << endl;
     if (client->kv739_die(serverNames[0], 1) == -1)
     {
-        cout << "Failed to send kill request to " << serverNames[idx] << " in TEST " << test_num << endl;
+        cout << "Failed to send kill request to " << serverNames[0] << " in TEST " << test_num << endl;
         return 0;
     }
 
@@ -391,9 +401,8 @@ int test_correctness_partition(KV739Client *client, char **serverNames)
         return 0;
     }
 
-    cout << "TEST " << test_num << " Killed server " << serverNames[0] << endl;
-
     // Wait for the server to recover.
+    cout << "Waiting for " << SLEEP_INTERVAL << " secs server to recover" << endl;
     sleep(SLEEP_INTERVAL);
 
     // measure correctness for that particular missed value
@@ -419,6 +428,79 @@ int test_correctness_partition(KV739Client *client, char **serverNames)
     return 0;
 }
 
+int test_correctness_partition_healing(KV739Client *client, char **serverNames)
+{
+    test_num++;
+    pid_t processID = getpid();
+
+    int idx = 0;
+    while(serverNames[idx])
+    {
+        // Parition all servers
+        char *reachable[] = {serverNames[(idx + 1) % total_servers], serverNames[(idx + 2) % total_servers], NULL};
+        if (client->kv739_partition(serverNames[idx], reachable) == -1)
+        {
+            cout << "Cannot heal partition for server " << serverNames[idx] << " in TEST " << test_num << endl;
+            return 0;
+        }
+        idx += 1;
+    }
+
+    // Wait for the servers to recover.
+    cout << "Waiting for " << SLEEP_INTERVAL << " secs server to recover" << endl;
+    sleep(SLEEP_INTERVAL);
+
+    char key[KEY_SIZE] = {0};
+    char newValue[VALUE_SIZE] = {0};
+    char oldValue[VALUE_SIZE] = {0};
+
+    // generate key/value pair. Use the key which one server does not have
+    sprintf(key, "%d%s%d", processID, "partition", 6);
+    sprintf(newValue, "%x%s%d", processID, "partitionMiss", 6);
+
+    // measure correctness for that particular missed value
+    for (int i = 0; i < MAX_PARTITION_TRIES; i++)
+    {
+
+        // send read request to a random server
+        if (client->kv739_get(key, oldValue) == -1)
+        {
+            cout << "Failed to send read request " << i << "in TEST " << test_num << endl;
+            return 0;
+        }
+
+        // all reads should match
+        if (strcmp(newValue, oldValue) != 0)
+        {
+            cout << "TEST " << test_num << " FAILED: Case " << i << " Expected " << newValue
+                 << ", Got " << oldValue << " for key " << key << endl;
+            return 0;
+        }
+    }
+
+    // test passed
+    cout << "TEST " << test_num << " PASSED - PARTITION HEALING" << endl;
+    return 1;
+}
+
+int test_correctness_client_permissions(KV739Client *client, int clean)
+{
+    test_num++;
+
+    // Lets try to kill a random IP:port
+    char server_name[] = "localhost:8989";
+
+    if (client->kv739_die(server_name, clean) == -1)
+    {
+        cout << "TEST " << test_num << " PASSED - CLIENT PERMISSIONS" << endl;
+        return 1;
+    }
+
+    // test failed
+    cout << "TEST " << test_num << " FAILED: Interacted with a server we did not init for" << endl;
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     if (argc == 1)
@@ -432,6 +514,7 @@ int main(int argc, char *argv[])
     for(int i = 1; i < argc; i++)
     {
         serverNames[i - 1] = new char[strlen(argv[i])];
+        total_servers++;
         strncpy(serverNames[i - 1], argv[i], strlen(argv[i]));
     }
     serverNames[argc - 1] = NULL;
@@ -446,7 +529,7 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    cout << "Server Init complete. Starting tests now" << endl;
+    cout << "Total Servers to init: " << total_servers << "\nStarting tests now..." << endl;
 
     int tests_passed = 0;
 
@@ -463,22 +546,31 @@ int main(int argc, char *argv[])
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability
-    tests_passed += test_correctness_durability(client, serverNames[0], 1000);
+    tests_passed += test_correctness_durability(client, serverNames, 1000);
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability -- clean stop
-    tests_passed += test_correctness_recovery(client, serverNames[0], 1000, 1);
+    tests_passed += test_correctness_recovery(client, serverNames, 1000, 1);
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability -- unclean stop
-    tests_passed += test_correctness_recovery(client, serverNames[0], 1000, 0);
+    tests_passed += test_correctness_recovery(client, serverNames, 1000, 0);
     cout << "-----------------------------------------" << endl;
 
     // check for non-existent keys
     tests_passed += test_correctness_key_existance(client);
     cout << "-----------------------------------------" << endl;
 
-    tests_passed += test_correctness_partition(client, &serverNames[0]);
+    // check if no recovery during partition
+    tests_passed += test_correctness_partition(client, serverNames);
+    cout << "-----------------------------------------" << endl;
+
+    // assumes that there is complete partition (only run after test_correctness_partition)
+    tests_passed += test_correctness_partition_healing(client, serverNames);
+    cout << "-----------------------------------------" << endl;
+
+    // check for client permissions (cannot reach server to which we did not init)
+    tests_passed += test_correctness_client_permissions(client, 1);
     cout << "-----------------------------------------" << endl;
 
     // free state and disconnect from server
@@ -488,12 +580,13 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    cout << "TESTS PASSED: " << tests_passed << "/" << TOTAL_TESTS << endl;
+    cout << "TESTS PASSED: " << tests_passed << "/" << test_num << endl;
 
     // cleanup
     for (int i = 0; i < argc; i++)
         delete serverNames[i];
     delete serverNames;
+    delete client;
 
     return 0;
 }

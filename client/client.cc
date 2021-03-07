@@ -174,14 +174,12 @@ KV739Client::KV739Client()
 
     // grpc handler
     client = new RecoverKVClient(
-            grpc::CreateChannel(lb_addr, grpc::InsecureChannelCredentials()));
+        grpc::CreateChannel(lb_addr, grpc::InsecureChannelCredentials()));
 }
 
 // Destructor for clean up
 KV739Client::~KV739Client()
 {
-
-    this->kv739_shutdown();
 
     delete client;
     client = NULL;
@@ -225,7 +223,8 @@ int KV739Client::kv739_init(char **server_names)
             return -1;
         }
 
-        if (idx != 0) {
+        if (idx != 0)
+        {
             servers_list = servers_list + ",";
         }
         servers_list = servers_list + server_names[idx];
@@ -372,7 +371,8 @@ int KV739Client::kv739_partition(char *server_name, char **reachable)
             return client->partitionServer(client_id, server_name, "");
         }
 
-        if (idx != 0) {
+        if (idx != 0)
+        {
             reachable_list = reachable_list + ",";
         }
         reachable_list = reachable_list + reachable[idx];

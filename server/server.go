@@ -99,7 +99,7 @@ func (s *server) StopServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Em
 	go func() {
 		fmt.Println("Stop server received. Waiting")
 		// wait for 1 second
-		time.Sleep(time.Second)
+		time.Sleep(500 * time.Millisecond)
 		// then exit the parent process
 		fmt.Println("Exited")
 		// panic("Unclean exit")
