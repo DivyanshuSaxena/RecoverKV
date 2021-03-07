@@ -295,7 +295,7 @@ func recoveryStage() {
 	peers, err := FetchAlivePeers()
 	if err != nil {
 		log.Info("[Recovery] failed to fetch peers so quiting recovery!")
-		return
+		//return
 	}
 	log.Infof("Rec: alive peers successful %v\n", peers)
 
@@ -412,10 +412,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
+	defer serv_lis.Close()
+
 	rec_lis, err := net.Listen("tcp", ip_rec_port)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
+	defer rec_lis.Close()
 
 	// Main LB facing server
 	serv_s := grpc.NewServer()

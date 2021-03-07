@@ -139,7 +139,7 @@ func StartServer(serverID int) {
 	// serverList[serverID].mode = 0
 	// serverList[serverID].lock.Unlock()
 
-	Redial(serverID)
+	// Redial(serverID)
 }
 
 func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
@@ -354,7 +354,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	key := in.GetKey()
 	log.Debugf("GetValue Received: %v\n", key)
 
-	maxTries := 10
+	maxTries := 500
 	// In case a server times out, retry connection for maximum maxTries
 	for i := 0; i < maxTries; i++ {
 
@@ -366,6 +366,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		serverList[serverID].lock.Unlock()
 
 		if mode != 1 {
+			time.Sleep(50 * time.Millisecond)
 			log.Debugf("Found dead server %v at iter %v\n", serverID, i)
 			continue
 		}
@@ -387,7 +388,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 				serverList[serverID].mode = -1
 				serverList[serverID].lock.Unlock()
 
-				go StartServer(serverID)
+				StartServer(serverID)
 			}
 			continue
 		}
