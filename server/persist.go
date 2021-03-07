@@ -4,12 +4,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	_ "github.com/mattn/go-sqlite3"
+	log "github.com/sirupsen/logrus"
 	"os"
 	"regexp"
 	"strconv"
 	"strings"
-	_ "github.com/mattn/go-sqlite3"
-	log "github.com/sirupsen/logrus"
 )
 
 var prep_query string
@@ -28,8 +28,8 @@ func init() {
 	log.SetOutput(file)
 	Formatter := new(log.TextFormatter)
 	Formatter.TimestampFormat = "02-01-2006 15:04:05"
-    Formatter.FullTimestamp = true
-    log.SetFormatter(Formatter)
+	Formatter.FullTimestamp = true
+	log.SetFormatter(Formatter)
 	log.SetOutput(file)
 	// Enable debug mode
 	//ll = log.DebugLevel

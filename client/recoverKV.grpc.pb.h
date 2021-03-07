@@ -1376,6 +1376,14 @@ class Internal final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::AlivePeersResponse>> PrepareAsyncfetchAlivePeers(::grpc::ClientContext* context, const ::recoverKV::ServerInfo& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::AlivePeersResponse>>(PrepareAsyncfetchAlivePeersRaw(context, request, cq));
     }
+    // Ping the server to check if the gRPC connection is alive
+    virtual ::grpc::Status pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::google::protobuf::Empty* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::google::protobuf::Empty>> AsyncpingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::google::protobuf::Empty>>(AsyncpingServerRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::google::protobuf::Empty>> PrepareAsyncpingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::google::protobuf::Empty>>(PrepareAsyncpingServerRaw(context, request, cq));
+    }
     class experimental_async_interface {
      public:
       virtual ~experimental_async_interface() {}
@@ -1426,6 +1434,13 @@ class Internal final {
       #else
       virtual void fetchAlivePeers(::grpc::ClientContext* context, const ::recoverKV::ServerInfo* request, ::recoverKV::AlivePeersResponse* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
       #endif
+      // Ping the server to check if the gRPC connection is alive
+      virtual void pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response, std::function<void(::grpc::Status)>) = 0;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      virtual void pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      #else
+      virtual void pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response, ::grpc::experimental::ClientUnaryReactor* reactor) = 0;
+      #endif
     };
     #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
     typedef class experimental_async_interface async_interface;
@@ -1450,6 +1465,8 @@ class Internal final {
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::Ack>* PrepareAsyncmarkMeRaw(::grpc::ClientContext* context, const ::recoverKV::MarkStatus& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::AlivePeersResponse>* AsyncfetchAlivePeersRaw(::grpc::ClientContext* context, const ::recoverKV::ServerInfo& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::recoverKV::AlivePeersResponse>* PrepareAsyncfetchAlivePeersRaw(::grpc::ClientContext* context, const ::recoverKV::ServerInfo& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::google::protobuf::Empty>* AsyncpingServerRaw(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::google::protobuf::Empty>* PrepareAsyncpingServerRaw(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) = 0;
   };
   class Stub final : public StubInterface {
    public:
@@ -1505,6 +1522,13 @@ class Internal final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::AlivePeersResponse>> PrepareAsyncfetchAlivePeers(::grpc::ClientContext* context, const ::recoverKV::ServerInfo& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::recoverKV::AlivePeersResponse>>(PrepareAsyncfetchAlivePeersRaw(context, request, cq));
     }
+    ::grpc::Status pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::google::protobuf::Empty* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::google::protobuf::Empty>> AsyncpingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::google::protobuf::Empty>>(AsyncpingServerRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::google::protobuf::Empty>> PrepareAsyncpingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::google::protobuf::Empty>>(PrepareAsyncpingServerRaw(context, request, cq));
+    }
     class experimental_async final :
       public StubInterface::experimental_async_interface {
      public:
@@ -1549,6 +1573,12 @@ class Internal final {
       #else
       void fetchAlivePeers(::grpc::ClientContext* context, const ::recoverKV::ServerInfo* request, ::recoverKV::AlivePeersResponse* response, ::grpc::experimental::ClientUnaryReactor* reactor) override;
       #endif
+      void pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response, std::function<void(::grpc::Status)>) override;
+      #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      void pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response, ::grpc::ClientUnaryReactor* reactor) override;
+      #else
+      void pingServer(::grpc::ClientContext* context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response, ::grpc::experimental::ClientUnaryReactor* reactor) override;
+      #endif
      private:
       friend class Stub;
       explicit experimental_async(Stub* stub): stub_(stub) { }
@@ -1575,6 +1605,8 @@ class Internal final {
     ::grpc::ClientAsyncResponseReader< ::recoverKV::Ack>* PrepareAsyncmarkMeRaw(::grpc::ClientContext* context, const ::recoverKV::MarkStatus& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::recoverKV::AlivePeersResponse>* AsyncfetchAlivePeersRaw(::grpc::ClientContext* context, const ::recoverKV::ServerInfo& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::recoverKV::AlivePeersResponse>* PrepareAsyncfetchAlivePeersRaw(::grpc::ClientContext* context, const ::recoverKV::ServerInfo& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::google::protobuf::Empty>* AsyncpingServerRaw(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::google::protobuf::Empty>* PrepareAsyncpingServerRaw(::grpc::ClientContext* context, const ::google::protobuf::Empty& request, ::grpc::CompletionQueue* cq) override;
     const ::grpc::internal::RpcMethod rpcmethod_FetchQueries_;
     const ::grpc::internal::RpcMethod rpcmethod_getValue_;
     const ::grpc::internal::RpcMethod rpcmethod_setValue_;
@@ -1582,6 +1614,7 @@ class Internal final {
     const ::grpc::internal::RpcMethod rpcmethod_partitionServer_;
     const ::grpc::internal::RpcMethod rpcmethod_markMe_;
     const ::grpc::internal::RpcMethod rpcmethod_fetchAlivePeers_;
+    const ::grpc::internal::RpcMethod rpcmethod_pingServer_;
   };
   static std::unique_ptr<Stub> NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
 
@@ -1602,6 +1635,8 @@ class Internal final {
     virtual ::grpc::Status markMe(::grpc::ServerContext* context, const ::recoverKV::MarkStatus* request, ::recoverKV::Ack* response);
     // Fetch Alive peers of a server
     virtual ::grpc::Status fetchAlivePeers(::grpc::ServerContext* context, const ::recoverKV::ServerInfo* request, ::recoverKV::AlivePeersResponse* response);
+    // Ping the server to check if the gRPC connection is alive
+    virtual ::grpc::Status pingServer(::grpc::ServerContext* context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response);
   };
   template <class BaseClass>
   class WithAsyncMethod_FetchQueries : public BaseClass {
@@ -1743,7 +1778,27 @@ class Internal final {
       ::grpc::Service::RequestAsyncUnary(6, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_FetchQueries<WithAsyncMethod_getValue<WithAsyncMethod_setValue<WithAsyncMethod_stopServer<WithAsyncMethod_partitionServer<WithAsyncMethod_markMe<WithAsyncMethod_fetchAlivePeers<Service > > > > > > > AsyncService;
+  template <class BaseClass>
+  class WithAsyncMethod_pingServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_pingServer() {
+      ::grpc::Service::MarkMethodAsync(7);
+    }
+    ~WithAsyncMethod_pingServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status pingServer(::grpc::ServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestpingServer(::grpc::ServerContext* context, ::google::protobuf::Empty* request, ::grpc::ServerAsyncResponseWriter< ::google::protobuf::Empty>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(7, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  typedef WithAsyncMethod_FetchQueries<WithAsyncMethod_getValue<WithAsyncMethod_setValue<WithAsyncMethod_stopServer<WithAsyncMethod_partitionServer<WithAsyncMethod_markMe<WithAsyncMethod_fetchAlivePeers<WithAsyncMethod_pingServer<Service > > > > > > > > AsyncService;
   template <class BaseClass>
   class ExperimentalWithCallbackMethod_FetchQueries : public BaseClass {
    private:
@@ -2064,11 +2119,58 @@ class Internal final {
     #endif
       { return nullptr; }
   };
+  template <class BaseClass>
+  class ExperimentalWithCallbackMethod_pingServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithCallbackMethod_pingServer() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodCallback(7,
+          new ::grpc::internal::CallbackUnaryHandler< ::google::protobuf::Empty, ::google::protobuf::Empty>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::google::protobuf::Empty* request, ::google::protobuf::Empty* response) { return this->pingServer(context, request, response); }));}
+    void SetMessageAllocatorFor_pingServer(
+        ::grpc::experimental::MessageAllocator< ::google::protobuf::Empty, ::google::protobuf::Empty>* allocator) {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(7);
+    #else
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::experimental().GetHandler(7);
+    #endif
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::google::protobuf::Empty, ::google::protobuf::Empty>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~ExperimentalWithCallbackMethod_pingServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status pingServer(::grpc::ServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* pingServer(
+      ::grpc::CallbackServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* pingServer(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/)
+    #endif
+      { return nullptr; }
+  };
   #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
-  typedef ExperimentalWithCallbackMethod_FetchQueries<ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<ExperimentalWithCallbackMethod_stopServer<ExperimentalWithCallbackMethod_partitionServer<ExperimentalWithCallbackMethod_markMe<ExperimentalWithCallbackMethod_fetchAlivePeers<Service > > > > > > > CallbackService;
+  typedef ExperimentalWithCallbackMethod_FetchQueries<ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<ExperimentalWithCallbackMethod_stopServer<ExperimentalWithCallbackMethod_partitionServer<ExperimentalWithCallbackMethod_markMe<ExperimentalWithCallbackMethod_fetchAlivePeers<ExperimentalWithCallbackMethod_pingServer<Service > > > > > > > > CallbackService;
   #endif
 
-  typedef ExperimentalWithCallbackMethod_FetchQueries<ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<ExperimentalWithCallbackMethod_stopServer<ExperimentalWithCallbackMethod_partitionServer<ExperimentalWithCallbackMethod_markMe<ExperimentalWithCallbackMethod_fetchAlivePeers<Service > > > > > > > ExperimentalCallbackService;
+  typedef ExperimentalWithCallbackMethod_FetchQueries<ExperimentalWithCallbackMethod_getValue<ExperimentalWithCallbackMethod_setValue<ExperimentalWithCallbackMethod_stopServer<ExperimentalWithCallbackMethod_partitionServer<ExperimentalWithCallbackMethod_markMe<ExperimentalWithCallbackMethod_fetchAlivePeers<ExperimentalWithCallbackMethod_pingServer<Service > > > > > > > > ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_FetchQueries : public BaseClass {
    private:
@@ -2184,6 +2286,23 @@ class Internal final {
     }
     // disable synchronous version of this method
     ::grpc::Status fetchAlivePeers(::grpc::ServerContext* /*context*/, const ::recoverKV::ServerInfo* /*request*/, ::recoverKV::AlivePeersResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_pingServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_pingServer() {
+      ::grpc::Service::MarkMethodGeneric(7);
+    }
+    ~WithGenericMethod_pingServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status pingServer(::grpc::ServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
@@ -2326,6 +2445,26 @@ class Internal final {
     }
     void RequestfetchAlivePeers(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
       ::grpc::Service::RequestAsyncUnary(6, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_pingServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_pingServer() {
+      ::grpc::Service::MarkMethodRaw(7);
+    }
+    ~WithRawMethod_pingServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status pingServer(::grpc::ServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestpingServer(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(7, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -2595,6 +2734,44 @@ class Internal final {
       { return nullptr; }
   };
   template <class BaseClass>
+  class ExperimentalWithRawCallbackMethod_pingServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    ExperimentalWithRawCallbackMethod_pingServer() {
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+      ::grpc::Service::
+    #else
+      ::grpc::Service::experimental().
+    #endif
+        MarkMethodRawCallback(7,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+                   ::grpc::CallbackServerContext*
+    #else
+                   ::grpc::experimental::CallbackServerContext*
+    #endif
+                     context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->pingServer(context, request, response); }));
+    }
+    ~ExperimentalWithRawCallbackMethod_pingServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status pingServer(::grpc::ServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    #ifdef GRPC_CALLBACK_API_NONEXPERIMENTAL
+    virtual ::grpc::ServerUnaryReactor* pingServer(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #else
+    virtual ::grpc::experimental::ServerUnaryReactor* pingServer(
+      ::grpc::experimental::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)
+    #endif
+      { return nullptr; }
+  };
+  template <class BaseClass>
   class WithStreamedUnaryMethod_getValue : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
@@ -2756,7 +2933,34 @@ class Internal final {
     // replace default version of method with streamed unary
     virtual ::grpc::Status StreamedfetchAlivePeers(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::recoverKV::ServerInfo,::recoverKV::AlivePeersResponse>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<WithStreamedUnaryMethod_stopServer<WithStreamedUnaryMethod_partitionServer<WithStreamedUnaryMethod_markMe<WithStreamedUnaryMethod_fetchAlivePeers<Service > > > > > > StreamedUnaryService;
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_pingServer : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_pingServer() {
+      ::grpc::Service::MarkMethodStreamed(7,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::google::protobuf::Empty, ::google::protobuf::Empty>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::google::protobuf::Empty, ::google::protobuf::Empty>* streamer) {
+                       return this->StreamedpingServer(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_pingServer() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status pingServer(::grpc::ServerContext* /*context*/, const ::google::protobuf::Empty* /*request*/, ::google::protobuf::Empty* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedpingServer(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::google::protobuf::Empty,::google::protobuf::Empty>* server_unary_streamer) = 0;
+  };
+  typedef WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<WithStreamedUnaryMethod_stopServer<WithStreamedUnaryMethod_partitionServer<WithStreamedUnaryMethod_markMe<WithStreamedUnaryMethod_fetchAlivePeers<WithStreamedUnaryMethod_pingServer<Service > > > > > > > StreamedUnaryService;
   template <class BaseClass>
   class WithSplitStreamingMethod_FetchQueries : public BaseClass {
    private:
@@ -2785,7 +2989,7 @@ class Internal final {
     virtual ::grpc::Status StreamedFetchQueries(::grpc::ServerContext* context, ::grpc::ServerSplitStreamer< ::recoverKV::RecRequest,::recoverKV::RecResponse>* server_split_streamer) = 0;
   };
   typedef WithSplitStreamingMethod_FetchQueries<Service > SplitStreamedService;
-  typedef WithSplitStreamingMethod_FetchQueries<WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<WithStreamedUnaryMethod_stopServer<WithStreamedUnaryMethod_partitionServer<WithStreamedUnaryMethod_markMe<WithStreamedUnaryMethod_fetchAlivePeers<Service > > > > > > > StreamedService;
+  typedef WithSplitStreamingMethod_FetchQueries<WithStreamedUnaryMethod_getValue<WithStreamedUnaryMethod_setValue<WithStreamedUnaryMethod_stopServer<WithStreamedUnaryMethod_partitionServer<WithStreamedUnaryMethod_markMe<WithStreamedUnaryMethod_fetchAlivePeers<WithStreamedUnaryMethod_pingServer<Service > > > > > > > > StreamedService;
 };
 
 }  // namespace recoverKV

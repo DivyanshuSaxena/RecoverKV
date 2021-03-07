@@ -3,20 +3,20 @@ package main
 import (
 	"context"
 	"errors"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"math/rand"
 	"net"
 	"os"
 	"os/exec"
+	pb "recoverKV/gen/recoverKV"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
-	"strconv"
-	pb "recoverKV/gen/recoverKV"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -37,8 +37,9 @@ peer_list = initially everyone but this can change as client requests.
 // Defines the port to run and total nodes in system
 var (
 	ip_port string
-	nodes int
+	nodes   int
 )
+
 // ServerInstance holds server states
 // serverID	- is the index of the server in the serverList
 // mode 		- can take one of: 1: ALIVE, 0: ZOMBIE, -1: DEAD
@@ -71,9 +72,9 @@ var (
 	queryIDMu           = sync.Mutex{}
 	clientMap           = make(clientMAP)
 	serverNameMap       = make(serverNameMAP)
-	serverList          []ServerInstance
-	address             []string
-	recPort             []string
+	serverList    []ServerInstance
+	address       []string
+	recPort       []string
 )
 
 type loadBalancer struct {
@@ -124,10 +125,10 @@ func StartServer(serverID int) {
 
 	// Sleep to allow server exit
 	time.Sleep(time.Second)
-	tmp := strings.Split(ip_port,":") // parse ip and port
+	tmp := strings.Split(ip_port, ":") // parse ip and port
 	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort, tmp[0], tmp[1], "0")
 	cmd.Stdout = os.Stdout
-	log.Println("Started dead server ", ipAddr)
+	log.Println("Started dead server ", server.name)
 	err := cmd.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -149,7 +150,7 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 	serverName := in.GetServerName()
 	reachable := in.GetReachable()
 	reachableList := strings.Split(reachable, ",")
-	log.Printf("Received in stop server: %v:%v:%v\n", clientID, serverName, reachable)
+	log.Printf("Received in partition server: %v:%v:%v\n", clientID, serverName, reachable)
 
 	ret := CanContactServer(clientID, serverName)
 	if ret == -1 {
@@ -290,7 +291,7 @@ func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*
 		mode := serverList[serverID].mode
 		serverList[serverID].lock.Unlock()
 
-		log.Printf("Mode for server %v is %v %T\n", serverID, mode, mode)
+		log.Printf("Mode for server %v is %v\n", serverID, mode)
 		if mode == 1 {
 			servers[i] = serverID
 			log.Printf("Server to contact: %v\n", serverName)
@@ -303,6 +304,7 @@ func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*
 
 	// GRPC connection to servers successful, save state
 	clientMap[clientID] = ClientPermission{servers: servers}
+	log.Debug("InitLB: client servers: ", clientMap[clientID])
 
 	return &pb.Response{Value: "", SuccessCode: successCode}, nil
 }
@@ -344,7 +346,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	key := in.GetKey()
 	log.Debugf("GetValue Received: %v\n", key)
 
-	maxTries := 5
+	maxTries := 10
 	// In case a server times out, retry connection for maximum maxTries
 	for i := 0; i < maxTries; i++ {
 
@@ -356,6 +358,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		serverList[serverID].lock.Unlock()
 
 		if mode != 1 {
+			log.Debugf("Found dead server %v at iter %v\n", serverID, i)
 			continue
 		}
 
@@ -535,31 +538,34 @@ func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.Serv
 // Takes arguments
 // lb_ip_addr:port, num_nodes, node_1_ip:serverPort, node_2_ip:serverPort,...recPort1, recPort2,...
 func main() {
+
+	rand.Seed(time.Now().UnixNano())
+
 	Formatter := new(log.TextFormatter)
-    Formatter.TimestampFormat = "02-01-2006 15:04:05"
-    Formatter.FullTimestamp = true
-    log.SetFormatter(Formatter)
+	Formatter.TimestampFormat = "02-01-2006 15:04:05"
+	Formatter.FullTimestamp = true
+	log.SetFormatter(Formatter)
+
 	// Enable debug mode
-	// ll = log.DebugLevel
-	// log.SetLevel(ll)
-	
+	// log.SetLevel(log.DebugLevel)
+
 	////////////////////////////////////////////////////
 	// Establish connection with all nodes and store a global mapping
 	// of name <host:port> <-> client object. We should also store a bit
 	// if they are alive or dead (dead being categorized by timeout or fail-stop)
 	// This makes sure we always make three conn (independent of number of client joining)
 	////////////////////////////////////////////////////
-	ip_port  = os.Args[1]
-	nodes,_ = strconv.Atoi(os.Args[2])
-	
+	ip_port = os.Args[1]
+	nodes, _ = strconv.Atoi(os.Args[2])
+
 	// Populate node details
-	for i:= 3; i < nodes+3; i++{
+	for i := 3; i < nodes+3; i++ {
 		address = append(address, os.Args[i])
 	}
-	for i:= nodes+3; i < len(os.Args); i++{
+	for i := nodes + 3; i < len(os.Args); i++ {
 		recPort = append(recPort, os.Args[i])
 	}
-	serverList          = make([]ServerInstance, nodes)
+	serverList = make([]ServerInstance, nodes)
 	// Set up distinct connections to the servers.
 	log.Printf("Num nodes: %v\n", nodes)
 	for i := 0; i < nodes; i++ {
@@ -573,9 +579,10 @@ func main() {
 		// Assumes that the servers are already running
 		conn, err := grpc.Dial(name, grpc.WithInsecure())
 		if err != nil {
-			log.Fatalf("did not connect: %v\n", err)
+			log.Fatalf("Could not connect: %v\n", err)
 		}
 		defer conn.Close()
+
 		c := pb.NewInternalClient(conn)
 		log.Printf("Added server id %v\n", i)
 		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 0, lock: sync.Mutex{}}

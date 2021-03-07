@@ -7,17 +7,21 @@
 
 using namespace std;
 
-#define TOTAL_TESTS 7
+#define TOTAL_TESTS 8
 #define KEY_SIZE 50
 #define VALUE_SIZE 100
 #define MAX_PARTITION_TRIES 1000
 
-#define SLEEP_INTERVAL 15
+#define SLEEP_INTERVAL 5
+
+int test_num = 0;
 
 // SINGLE WRITE CYCLE FOLLOWED BY READS
 int test_correctness_single_write_and_read(KV739Client *client,
         int total_requests)
 {
+
+    test_num++;
     // get process id
     pid_t processID = getpid();
 
@@ -33,11 +37,11 @@ int test_correctness_single_write_and_read(KV739Client *client,
 
     // send write requests to server
     for (int i = 0; i < total_requests; i++)
-    {		
-    		int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
+    {
+        int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
         if (res == -1 || res == -2)
         {
-            cout << "Failed to send write request " << i << " in TEST 1" << endl;
+            cout << "Failed to send write request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
@@ -47,7 +51,7 @@ int test_correctness_single_write_and_read(KV739Client *client,
     {
         if (client->kv739_get(keys[i], oldValues[i]) == -1)
         {
-            cout << "Failed to send read request " << i << " in TEST 1" << endl;
+            cout << "Failed to send read request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
@@ -57,14 +61,14 @@ int test_correctness_single_write_and_read(KV739Client *client,
     {
         if (strcmp(newValues[i], oldValues[i]) != 0)
         {
-            cout << "TEST 1 FAILED: Case " << i << " Expected " << newValues[i]
+            cout << "TEST " << test_num << " FAILED: Case " << i << " Expected " << newValues[i]
                  << ", Got " << oldValues[i] << endl;
             return 0;
         }
     }
 
     // test passed
-    cout << "TEST 1 PASSED - SINGLE UPDATES" << endl;
+    cout << "TEST " << test_num << " PASSED - SINGLE UPDATES" << endl;
     return 1;
 }
 
@@ -72,6 +76,7 @@ int test_correctness_single_write_and_read(KV739Client *client,
 int test_correctness_write_intensive(KV739Client *client, int total_requests,
                                      int total_cycles)
 {
+    test_num++;
     // get process id
     pid_t processID = getpid();
 
@@ -91,7 +96,7 @@ int test_correctness_write_intensive(KV739Client *client, int total_requests,
         int res = client->kv739_put(keys[i % total_requests], newValues[i], oldValues[i % total_requests]);
         if (res == -1 || res == -2)
         {
-            cout << "Failed to send write request " << i << " in TEST 2" << endl;
+            cout << "Failed to send write request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
@@ -101,7 +106,7 @@ int test_correctness_write_intensive(KV739Client *client, int total_requests,
     {
         if (client->kv739_get(keys[i], oldValues[i]) == -1)
         {
-            cout << "Failed to send read request " << i << " in TEST 2" << endl;
+            cout << "Failed to send read request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
@@ -112,14 +117,14 @@ int test_correctness_write_intensive(KV739Client *client, int total_requests,
     {
         if (strcmp(newValues[i + delta], oldValues[i]) != 0)
         {
-            cout << "TEST 2 FAILED: Case " << i << " Expected "
+            cout << "TEST " << test_num << " FAILED: Case " << i << " Expected "
                  << newValues[i + delta] << ", Got " << oldValues[i] << endl;
             return 0;
         }
     }
 
     // test passed
-    cout << "TEST 2 PASSED - MULTPLE WRITES" << endl;
+    cout << "TEST " << test_num << " PASSED - MULTPLE WRITES" << endl;
     return 1;
 }
 
@@ -127,6 +132,7 @@ int test_correctness_write_intensive(KV739Client *client, int total_requests,
 int test_correctness_read_intensive(KV739Client *client, int total_requests,
                                     int total_cycles)
 {
+    test_num++;
     // get process id
     pid_t processID = getpid();
 
@@ -145,9 +151,9 @@ int test_correctness_read_intensive(KV739Client *client, int total_requests,
     {
         int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
 
-        if (res	== -1 || res == -2)
+        if (res == -1 || res == -2)
         {
-            cout << "Failed to send write request " << i << " in TEST 3" << endl;
+            cout << "Failed to send write request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
@@ -157,7 +163,7 @@ int test_correctness_read_intensive(KV739Client *client, int total_requests,
     {
         if (client->kv739_get(keys[i % total_requests], oldValues[i]) == -1)
         {
-            cout << "Failed to send read request " << i << " in TEST 3" << endl;
+            cout << "Failed to send read request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
@@ -168,20 +174,21 @@ int test_correctness_read_intensive(KV739Client *client, int total_requests,
     {
         if (strcmp(newValues[i], oldValues[i + delta]) != 0)
         {
-            cout << "TEST 3 FAILED: Case " << i << " Expected " << newValues[i]
+            cout << "TEST " << test_num << " FAILED: Case " << i << " Expected " << newValues[i]
                  << ", Got " << oldValues[i + delta] << endl;
             return 0;
         }
     }
 
     // test passed
-    cout << "TEST 3 PASSED - MULTPLE READS" << endl;
+    cout << "TEST " << test_num << " PASSED - MULTPLE READS" << endl;
     return 1;
 }
 
 // DURABILITY TEST
 int test_correctness_durability(KV739Client *client, char *server_name, int total_requests)
 {
+    test_num++;
     // get process id
     pid_t processID = getpid();
 
@@ -199,29 +206,26 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
     for (int i = 0; i < total_requests; i++)
     {
         int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
-        if (res	== -1 || res == -2)
+        if (res == -1 || res == -2)
         {
-            cout << "Failed to send write request " << i << " in TEST 4" << endl;
+            cout << "Failed to send write request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
 
-    cout << "TEST 4 [Killed server " << server_name << " please restart it.] " << endl;
+    cout << "TEST " << test_num << " Killed server " << server_name  << endl;
     if (client->kv739_die(server_name, 1) == -1)
     {
-        cout << "Failed to send kill request to " << server_name << " in TEST 4" << endl;
+        cout << "Failed to send kill request to " << server_name << " in TEST " << test_num << endl;
         return 0;
     }
-
-    // Ideally, we should not have to wait for any command
-    sleep(5);
 
     // send read request to server
     for (int i = 0; i < total_requests; i++)
     {
         if (client->kv739_get(keys[i], oldValues[i]) == -1)
         {
-            cout << "Failed to send read request " << i << " in TEST 4" << endl;
+            cout << "Failed to send read request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
@@ -231,20 +235,21 @@ int test_correctness_durability(KV739Client *client, char *server_name, int tota
     {
         if (strcmp(newValues[i], oldValues[i]) != 0)
         {
-            cout << "TEST 4 FAILED: Case " << i << " Expected " << newValues[i]
+            cout << "TEST " << test_num << " FAILED: Case " << i << " Expected " << newValues[i]
                  << ", Got " << oldValues[i] << "for key " << keys[i] << endl;
             return 0;
         }
     }
 
     // test passed
-    cout << "TEST 4 PASSED - DURABILITY" << endl;
+    cout << "TEST " << test_num << " PASSED - DURABILITY" << endl;
     return 1;
 }
 
 // RECOVERY TEST
 int test_correctness_recovery(KV739Client *client, char *server_name, int total_requests, int clean)
 {
+    test_num++;
     // get process id
     pid_t processID = getpid();
 
@@ -262,46 +267,42 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
     for (int i = 0; i < total_requests / 4; i++)
     {
         int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
-        if (res	== -1 || res == -2)
+        if (res == -1 || res == -2)
         {
-            cout << "Failed to send write request " << i << " in TEST 4" << endl;
+            cout << "Failed to send write request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
 
-    cout << "TEST 4 [Killed server " << server_name << " please restart it.] " << endl;
+    cout << "TEST " << test_num << " Killed server " << server_name << endl;
     if (client->kv739_die(server_name, clean) == -1)
     {
-        cout << "Failed to send kill request to " << server_name << " in TEST 4" << endl;
+        cout << "Failed to send kill request to " << server_name << " in TEST " << test_num << endl;
         return 0;
     }
-
-    // Ideally, we should not have to wait for any command
-    // cout << "Waiting for server to die" << endl;
-    // sleep(2);
 
     // send write requests to server -- again
     for (int i = total_requests / 4; i < total_requests; i++)
     {
         int res = client->kv739_put(keys[i], newValues[i], oldValues[i]);
-        if (res	== -1 || res == -2)
+        if (res == -1 || res == -2)
         {
-            cout << "Failed to send write request " << i << " in TEST 4" << endl;
+            cout << "Failed to send write request " << i << "in TEST " << test_num << endl;
             return 0;
         }
     }
 
     // Ideally, we should not have to wait for any command
     cout << "Waiting for 5 secs server to recover" << endl;
-    sleep(5);
+    sleep(SLEEP_INTERVAL);
 
     // send read request to server
     for (int i = 0; i < total_requests; i++)
     {
         if (client->kv739_get(keys[i], oldValues[i]) == -1)
         {
-            cout << "Failed to send read request " << i << " in TEST 4" << endl;
-            // return 0;
+            cout << "Failed to send read request " << i << "in TEST " << test_num << endl;
+            return 0;
         }
     }
 
@@ -310,37 +311,38 @@ int test_correctness_recovery(KV739Client *client, char *server_name, int total_
     {
         if (strcmp(newValues[i], oldValues[i]) != 0)
         {
-            cout << "TEST 4 FAILED: Case " << i << " Expected " << newValues[i]
+            cout << "TEST " << test_num << " FAILED: Case " << i << " Expected " << newValues[i]
                  << ", Got " << oldValues[i] << "for key " << keys[i] << endl;
-            // return 0;
+            return 0;
         }
     }
 
     // test passed
-    cout << "TEST 4 PASSED - RECOVERY" << endl;
+    cout << "TEST " << test_num << " PASSED - RECOVERY WITH CLEAN: " << clean << endl;
     return 1;
 }
 
 // CHECK FOR INVALID KEY EXISTENCE
 int test_correctness_key_existance(KV739Client *client)
 {
+    test_num++;
     char key[KEY_SIZE] = "][";
     char oldValue[VALUE_SIZE] = {0};
 
     if (client->kv739_get(key, oldValue) != 1)
     {
-        cout << "TEST 5 FAILED: " << key << " exists on server" << endl;
+        cout << "TEST " << test_num << " FAILED: " << key << " exists on server" << endl;
         return 0;
     }
 
     // test passed
-    cout << "TEST 5 PASSED - KEY EXISTENCE" << endl;
+    cout << "TEST " << test_num << " PASSED - KEY EXISTENCE" << endl;
     return 1;
 }
 
 int test_correctness_partition(KV739Client *client, char **serverNames)
 {
-
+    test_num++;
     pid_t processID = getpid();
 
     // Parition all servers
@@ -351,7 +353,7 @@ int test_correctness_partition(KV739Client *client, char **serverNames)
     {
         if (client->kv739_partition(serverNames[idx], reachable) == -1)
         {
-            cout << "Cannot partition server " << serverNames[idx] << " in TEST 6" << endl;
+            cout << "Cannot partition server " << serverNames[idx] << " in TEST " << test_num << endl;
             return 0;
         }
         idx += 1;
@@ -367,35 +369,32 @@ int test_correctness_partition(KV739Client *client, char **serverNames)
 
     // send write request to all servers
     int res = client->kv739_put(key, newValue, oldValue);
-    if (res	== -1 || res == -2)
+    if (res == -1 || res == -2)
     {
-        cout << "Failed to send write request " << " in TEST 6" << endl;
+        cout << "Failed to send write request " << " in TEST " << test_num << endl;
         return 0;
     }
 
     // Kill a server (cleanly)
     if (client->kv739_die(serverNames[0], 1) == -1)
     {
-        cout << "Failed to send kill request to " << serverNames[idx] << " in TEST 6" << endl;
+        cout << "Failed to send kill request to " << serverNames[idx] << " in TEST " << test_num << endl;
         return 0;
     }
-
-    // just to make sure it is fully dead
-    sleep(2);
 
     // send write request with same key but different value so that killed server misses update
     sprintf(newValue, "%x%s%d", processID, "partitionMiss", 6);
     res = client->kv739_put(key, newValue, oldValue);
-    if (res	== -1 || res == -2)
+    if (res == -1 || res == -2)
     {
-        cout << "Failed to send updated write request " << " in TEST 6" << endl;
+        cout << "Failed to send updated write request " << " in TEST " << test_num << endl;
         return 0;
     }
 
-    cout << "TEST 6 [Killed server " << serverNames[0] << " please restart it.] " << endl;
+    cout << "TEST " << test_num << " Killed server " << serverNames[0] << endl;
 
-    // Wait for the server to die.
-    sleep(2);
+    // Wait for the server to recover.
+    sleep(SLEEP_INTERVAL);
 
     // measure correctness for that particular missed value
     for (int i = 0; i < MAX_PARTITION_TRIES; i++)
@@ -404,19 +403,19 @@ int test_correctness_partition(KV739Client *client, char **serverNames)
         // send read request to a random server
         if (client->kv739_get(key, oldValue) == -1)
         {
-            cout << "Failed to send read request " << i << " in TEST 6" << endl;
+            cout << "Failed to send read request " << i << "in TEST " << test_num << endl;
             return 0;
         }
 
         if (strcmp(newValue, oldValue) != 0)
         {
-            cout << "TEST 6 PASSED - PARTITION" << endl;
+            cout << "TEST " << test_num << " PASSED - PARTITION" << endl;
             return 1;
         }
     }
 
     // test failed
-    cout << "TEST 6 FAILED: All servers are updated for key: " << key << endl;
+    cout << "TEST " << test_num << " FAILED: All servers are updated for key: " << key << endl;
     return 0;
 }
 
@@ -430,11 +429,12 @@ int main(int argc, char *argv[])
 
     // get server names from command line
     char **serverNames = new char *[argc];
-    for(int i = 1; i < argc; i++) {
-    	serverNames[i-1] = new char[strlen(argv[i])];
-      strncpy(serverNames[i-1], argv[i], strlen(argv[i]));
+    for(int i = 1; i < argc; i++)
+    {
+        serverNames[i - 1] = new char[strlen(argv[i])];
+        strncpy(serverNames[i - 1], argv[i], strlen(argv[i]));
     }
-    serverNames[argc-1] = NULL;
+    serverNames[argc - 1] = NULL;
 
     // construct client
     KV739Client *client = new KV739Client();
@@ -451,19 +451,19 @@ int main(int argc, char *argv[])
     int tests_passed = 0;
 
     // sanity check for writes and reads
-    // tests_passed += test_correctness_single_write_and_read(client, 1000);
+    tests_passed += test_correctness_single_write_and_read(client, 1000);
     cout << "-----------------------------------------" << endl;
 
     // multiple overallaping writes followed by reads
-    // tests_passed += test_correctness_write_intensive(client, 1000, 3);
+    tests_passed += test_correctness_write_intensive(client, 1000, 3);
     cout << "-----------------------------------------" << endl;
 
     // single writes followed by multiple reads
-    // tests_passed += test_correctness_read_intensive(client, 1000, 3);
+    tests_passed += test_correctness_read_intensive(client, 1000, 3);
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability
-    // tests_passed += test_correctness_durability(client, serverNames[0], 1000);
+    tests_passed += test_correctness_durability(client, serverNames[0], 1000);
     cout << "-----------------------------------------" << endl;
 
     // check server failure and data durability -- clean stop
@@ -475,23 +475,24 @@ int main(int argc, char *argv[])
     cout << "-----------------------------------------" << endl;
 
     // check for non-existent keys
-    // tests_passed += test_correctness_key_existance(client);
+    tests_passed += test_correctness_key_existance(client);
     cout << "-----------------------------------------" << endl;
 
-    // tests_passed += test_correctness_partition(client, &serverNames[0]);
+    tests_passed += test_correctness_partition(client, &serverNames[0]);
     cout << "-----------------------------------------" << endl;
 
     // free state and disconnect from server
-    if (client->kv739_shutdown() == -1) {
-    	cout << "Server shutdown falure" << endl;
-    	return 0;
+    if (client->kv739_shutdown() == -1)
+    {
+        cout << "Server shutdown falure" << endl;
+        return 0;
     }
 
     cout << "TESTS PASSED: " << tests_passed << "/" << TOTAL_TESTS << endl;
 
     // cleanup
     for (int i = 0; i < argc; i++)
-    	delete serverNames[i];
+        delete serverNames[i];
     delete serverNames;
 
     return 0;

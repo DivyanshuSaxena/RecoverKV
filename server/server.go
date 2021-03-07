@@ -4,17 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"io"
 	"math/rand"
 	"net"
 	"os"
+	pb "recoverKV/gen/recoverKV"
+	"strings"
 	"sync"
 	"time"
-	pb "recoverKV/gen/recoverKV"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
-	"io"
-	"strings"
-	"google.golang.org/grpc"
-	log "github.com/sirupsen/logrus"
 )
 
 var ip_addr string
@@ -188,6 +188,7 @@ func rpcRequestLogs(peer_addr string, global_uid int64, max_local_uid int64) (bo
 
 	log.Infof("Peer address to fetch from: %v\n", peer_addr)
 	// dial peer
+	// TODO: No need to dial again, just maintain a global state on startup
 	conn, err := grpc.Dial(peer_addr, grpc.WithInsecure())
 	defer conn.Close()
 	if err != nil {
@@ -327,6 +328,9 @@ func recoveryStage() {
 	var rec_success bool
 	for _, peer := range peer_list {
 		rec_success, err = rpcRequestLogs(peer, global_uid, max_local_uid)
+		if err != nil {
+			log.Infof("[Recovery] %v", err)
+		}
 		// Done processing all queries, so mark completion
 		// TODO: Add break here when number of holes requested
 		// 		is satisfied - can achieve this with a counter.
@@ -385,11 +389,12 @@ func main() {
 	}
 	Formatter := new(log.TextFormatter)
 	Formatter.TimestampFormat = "02-01-2006 15:04:05"
-    Formatter.FullTimestamp = true
+	Formatter.FullTimestamp = true
+
 	// Enable debug mode
-	//ll = log.DebugLevel
-	//log.SetLevel(ll)
-    log.SetFormatter(Formatter)
+	// log.SetLevel(log.DebugLevel)
+
+	log.SetFormatter(Formatter)
 	log.SetOutput(file)
 	defer file.Close()
 
