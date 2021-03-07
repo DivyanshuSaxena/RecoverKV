@@ -289,7 +289,7 @@ func recoveryStage() {
 		log.Info("MarkMe failed so quiting!")
 		return
 	}
-	fmt.Printf("Rec: MarkMe successful %v\n", global_uid)
+	fmt.Debugf("Rec: MarkMe successful %v\n", global_uid)
 
 	// step 2
 	peers, err := FetchAlivePeers()
