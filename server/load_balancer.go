@@ -3,11 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"math/rand"
 	"net"
 	"os"
@@ -17,6 +12,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 /*
@@ -84,6 +85,16 @@ type loadBalancer struct {
 type loadBalancerInternal struct {
 	pb.UnimplementedInternalServer
 }
+
+// Data types and variables required for concurrent Puts
+type setValueChan struct {
+	serverID int
+	act      string
+	val      string
+	code     int32
+}
+
+const concurrentPuts bool = false
 
 // CanContactServer checks whether a given clientID can contact the given server.
 // Returns 1 if it can, 0 if not. And returns -1 if clientID is invalid.
@@ -430,35 +441,107 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	successfulPuts := 0
 
 	log.Debugf("%v In SetValue, server list: %v", time.Now().Unix(), serverList)
-	for serverID := range serverList {
-		if serverList[serverID].mode != -1 {
-			// Send request to the respective server. If connection unavailable, start server
-			resp, err := serverList[serverID].conn.SetValue(context.Background(), &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
-			if err != nil {
-				statusErr, _ := status.FromError(err)
-				log.Printf("error while contacting %v: %v || Code: %v\n", serverList[serverID].name, err, statusErr.Code())
 
-				// If timed out, mark node as DEAD
-				if statusErr.Code() == codes.Unavailable {
-					log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].name)
+	if !concurrentPuts {
+		// Block :- SEQUENTIAL PUTS
+		for serverID := range serverList {
+			if serverList[serverID].mode != -1 {
+				// Send request to the respective server. If connection unavailable, start server
+				resp, err := serverList[serverID].conn.SetValue(context.Background(), &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
+				if err != nil {
+					statusErr, _ := status.FromError(err)
+					log.Printf("error while contacting %v: %v || Code: %v\n", serverList[serverID].name, err, statusErr.Code())
 
-					serverList[serverID].lock.Lock()
-					serverList[serverID].mode = -1
-					serverList[serverID].lock.Unlock()
+					// If timed out, mark node as DEAD
+					if statusErr.Code() == codes.Unavailable {
+						log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].name)
 
-					go StartServer(serverID)
+						serverList[serverID].lock.Lock()
+						serverList[serverID].mode = -1
+						serverList[serverID].lock.Unlock()
+
+						go StartServer(serverID)
+					}
+				} else {
+					// COMPLETED: Do something if inconsistent values read from different servers
+					// log.Printf("Put succeeded with resp: %v\n", resp)
+					// Inconsistency can be caused due to recovering nodes. Hence, return the value of an ALIVE node
+					// Currently, server does not fetch the uid from the data table
+					if serverList[serverID].mode == 1 {
+						// TODO: How should we evaluate successful puts? In case of recovering and alive nodes
+						successfulPuts = successfulPuts + 1
+						val = resp.GetValue()
+						successCode = resp.GetSuccessCode()
+					}
 				}
-			} else {
-				// COMPLETED: Do something if inconsistent values read from different servers
-				// log.Printf("Put succeeded with resp: %v\n", resp)
-				// Inconsistency can be caused due to recovering nodes. Hence, return the value of an ALIVE node
-				// Currently, server does not fetch the uid from the data table
-				if serverList[serverID].mode == 1 {
-					// TODO: How should we evaluate successful puts? In case of recovering and alive nodes
-					successfulPuts = successfulPuts + 1
-					val = resp.GetValue()
-					successCode = resp.GetSuccessCode()
+			}
+		}
+	} else {
+		// Else block :- CONCURRENT PUTS
+		// Use a channel to send requests to all servers in parallel
+		var wg sync.WaitGroup
+		c := make(chan setValueChan)
+
+		// Add threads to wait group
+		wg.Add(len(serverList))
+		go func() {
+			wg.Wait()
+			close(c)
+		}()
+
+		for serverID := range serverList {
+			go func(id int) {
+				defer wg.Done()
+
+				if serverList[id].mode != -1 {
+					// Send request to the respective server. If connection unavailable, start server
+					// start := time.Now()
+					resp, err := serverList[id].conn.SetValue(context.Background(), &pb.InternalRequest{QueryID: savedQueryID, Key: in.GetKey(), Value: in.GetValue()})
+					// elapsed := time.Since(start)
+					// log.Printf("Put request to %v took %s", id, elapsed)
+
+					if err != nil {
+						statusErr, _ := status.FromError(err)
+						log.Printf("error while contacting %v: %v || Code: %v\n", serverList[id].name, err, statusErr.Code())
+
+						// If timed out, mark node as DEAD
+						if statusErr.Code() == codes.Unavailable {
+							c <- setValueChan{id, "start", "", -2}
+						}
+					} else {
+						// COMPLETED: Do something if inconsistent values read from different servers
+						// log.Printf("Put succeeded with resp: %v\n", resp)
+						// Inconsistency can be caused due to recovering nodes. Hence, return the value of an ALIVE node
+						// Currently, server does not fetch the uid from the data table
+						if serverList[id].mode == 1 {
+							c <- setValueChan{id, "success", resp.GetValue(), resp.GetSuccessCode()}
+						}
+					}
+				} else {
+					c <- setValueChan{id, "dead", "", -2}
 				}
+			}(serverID)
+		}
+		// loopElapsed := time.Since(loopStart)
+		// log.Printf("Loop took total %s", loopElapsed)
+
+		for st := range c {
+			// chanElapsed := time.Since(loopStart)
+			// log.Printf("Received in channel in %s", chanElapsed)
+			if st.act == "start" {
+				serverID := st.serverID
+				log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].name)
+
+				serverList[serverID].lock.Lock()
+				serverList[serverID].mode = -1
+				serverList[serverID].lock.Unlock()
+
+				go StartServer(serverID)
+			} else if st.act == "success" {
+				// TODO: How should we evaluate successful puts? In case of recovering and alive nodes
+				successfulPuts = successfulPuts + 1
+				val = st.val
+				successCode = st.code
 			}
 		}
 	}
