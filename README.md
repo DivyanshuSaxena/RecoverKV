@@ -35,7 +35,7 @@ Run `make` inside the `client/` directory to generate a new `lib739kv.so`. This 
 
 ## Server
 
-The server interface is written in Go and implements the key value service.
+The server interface is written in Go and implements the key value service. Install go and golang grpc packages.
 
 ### Instructions to build and execute
 
