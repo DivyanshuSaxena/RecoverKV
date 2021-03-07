@@ -4,14 +4,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"os"
-
 	"regexp"
 	"strconv"
 	"strings"
-
 	_ "github.com/mattn/go-sqlite3"
+	log "github.com/sirupsen/logrus"
 )
 
 var prep_query string
@@ -23,11 +21,20 @@ var updateStatement *sql.Stmt
 var updateLogStatement *sql.Stmt
 
 func init() {
-	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile("server"+serv_port+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.SetOutput(file)
+	Formatter := new(log.TextFormatter)
+	Formatter.TimestampFormat = "02-01-2006 15:04:05"
+    Formatter.FullTimestamp = true
+    log.SetFormatter(Formatter)
+	log.SetOutput(file)
+	// Enable debug mode
+	//ll = log.DebugLevel
+	//log.SetLevel(ll)
+	defer file.Close()
 }
 
 // InitDB initializes DB at the dbPath

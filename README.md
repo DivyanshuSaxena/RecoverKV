@@ -1,5 +1,13 @@
 # RecoverKV
 
+## Load balancer
+Example run
+```
+./recoverLB localhost:50050 3 localhost:50051 localhost:50052 localhost:50053 50055 50056 50057
+./run_server.sh localhost 50051 50055 localhost 50050 1
+./run_server.sh localhost 50052 50056 localhost 50050 1
+./run_server.sh localhost 50053 50057 localhost 50050 1
+```
 ## Client
 
 The client interface implements the methods to access the key/value server instance, based on GRPC protocol. Each client is an instance of the `KV739Client` class, the

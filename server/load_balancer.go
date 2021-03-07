@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -11,14 +10,13 @@ import (
 	"strings"
 	"sync"
 	"time"
-
+	"strconv"
 	pb "recoverKV/gen/recoverKV"
-
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	log "github.com/sirupsen/logrus"
 )
 
 /*
@@ -37,11 +35,10 @@ peer_list = initially everyone but this can change as client requests.
 */
 
 // Defines the port to run and total nodes in system
-const (
-	port  = ":50050"
-	nodes = 3
+var (
+	ip_port string
+	nodes int
 )
-
 // ServerInstance holds server states
 // serverID	- is the index of the server in the serverList
 // mode 		- can take one of: 1: ALIVE, 0: ZOMBIE, -1: DEAD
@@ -74,9 +71,9 @@ var (
 	queryIDMu           = sync.Mutex{}
 	clientMap           = make(clientMAP)
 	serverNameMap       = make(serverNameMAP)
-	serverList          = make([]ServerInstance, nodes)
-	address             = [3]string{":50051", ":50052", ":50053"}
-	recPort             = [3]string{":50054", ":50055", ":50056"}
+	serverList          []ServerInstance
+	address             []string
+	recPort             []string
 )
 
 type loadBalancer struct {
@@ -127,9 +124,10 @@ func StartServer(serverID int) {
 
 	// Sleep to allow server exit
 	time.Sleep(time.Second)
-	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort[1:], "localhost", port[1:], "0")
+	tmp := strings.Split(ip_port,":") // parse ip and port
+	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort, tmp[0], tmp[1], "0")
 	cmd.Stdout = os.Stdout
-	log.Println("Started dead server")
+	log.Println("Started dead server ", ipAddr)
 	err := cmd.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -264,7 +262,7 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 }
 
 func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*pb.Response, error) {
-	log.Printf("%v\n", serverList)
+	log.Debugf("%v\n", serverList)
 	var successCode int32 = 0
 
 	clientID := in.GetClientID()
@@ -282,7 +280,7 @@ func (lb *loadBalancer) InitLBState(ctx context.Context, in *pb.StateRequest) (*
 
 	// Get the serverIDs that must be added in the Client Permission object
 	servers := make([]int, len(serverListSlice))
-	log.Println(serverListSlice)
+	log.Debug(serverListSlice)
 
 	for i, serverName := range serverListSlice {
 		serverID := serverNameMap[serverName]
@@ -344,7 +342,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 	// Contact ANY ALIVE server grpc object and get value,successCode for this key
 	key := in.GetKey()
-	log.Printf("GetValue Received: %v\n", key)
+	log.Debugf("GetValue Received: %v\n", key)
 
 	maxTries := 5
 	// In case a server times out, retry connection for maximum maxTries
@@ -361,7 +359,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 			continue
 		}
 
-		log.Printf("Found alive server %v at iter %v\n", serverID, i)
+		log.Debugf("Found alive server %v at iter %v\n", serverID, i)
 
 		// ServerInstance.conn is Read only -- no lock needed for safety
 		resp, err := serverList[serverID].conn.GetValue(context.Background(), &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
@@ -383,7 +381,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 			continue
 		}
 
-		log.Println("GetValue Response: ", resp.GetValue())
+		log.Debug("GetValue Response: ", resp.GetValue())
 		return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
 	}
 
@@ -407,7 +405,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	}
 
 	// Contact ALL (alive+zombie) servers and update value,successCode for this key
-	log.Printf("SetValue Received: %v:%v\n", in.GetKey(), in.GetValue())
+	log.Debugf("SetValue Received: %v:%v\n", in.GetKey(), in.GetValue())
 
 	// [!] Also generate an ID for this Query
 	var savedQueryID int64 = 0
@@ -419,7 +417,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 	// Count number of successful writes
 	successfulPuts := 0
 
-	log.Printf("%v In SetValue, server list: %v", time.Now().Unix(), serverList)
+	log.Debugf("%v In SetValue, server list: %v", time.Now().Unix(), serverList)
 	for serverID := range serverList {
 		if serverList[serverID].mode != -1 {
 			// Send request to the respective server. If connection unavailable, start server
@@ -453,7 +451,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		}
 	}
 
-	log.Printf("SetValue successful puts: %v\n", successfulPuts)
+	log.Debugf("SetValue successful puts: %v\n", successfulPuts)
 	if successfulPuts > 0 {
 		return &pb.Response{Value: val, SuccessCode: successCode}, nil
 	}
@@ -467,14 +465,14 @@ func (lb *loadBalancerInternal) MarkMe(ctx context.Context, in *pb.MarkStatus) (
 	serverName := in.GetServerName()
 	updatedStatus := in.GetNewStatus()
 
-	log.Printf("MarkMe: name %v\n", serverName)
+	log.Debugf("MarkMe: name %v\n", serverName)
 	// Update status in global map
 	serverID := serverNameMap[serverName]
 
 	// Check if the gRPC connection is healed or not
 	emptyMsg := new(emptypb.Empty)
 	flag := false
-	log.Println("Blocking MarkMe")
+	log.Debug("Blocking MarkMe")
 	for !flag {
 		_, err := serverList[serverID].conn.PingServer(context.Background(), emptyMsg)
 		if err != nil {
@@ -483,19 +481,19 @@ func (lb *loadBalancerInternal) MarkMe(ctx context.Context, in *pb.MarkStatus) (
 			break
 		}
 	}
-	log.Println("MarkMe unblocked")
+	log.Debug("MarkMe unblocked")
 
-	log.Printf("MarkMe: Reached LB\n")
+	log.Debug("MarkMe: Reached LB\n")
 	serverList[serverID].lock.Lock()
 	serverList[serverID].mode = updatedStatus
-	log.Printf("Marked server %v as %v\n", serverID, updatedStatus)
+	log.Printf("Marked server id %v as %v\n", serverID, updatedStatus)
 	serverList[serverID].lock.Unlock()
 
 	// Send the current max global ID back to the server
 	queryIDMu.Lock()
 	globalUID := queryID
 	queryIDMu.Unlock()
-	log.Printf("%v\n", serverList)
+	log.Debugf("%v\n", serverList)
 
 	return &pb.Ack{GlobalUID: globalUID}, nil
 }
@@ -534,20 +532,39 @@ func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.Serv
 	return &pb.AlivePeersResponse{AliveList: aliveList}, nil
 }
 
+// Takes arguments
+// lb_ip_addr:port, num_nodes, node_1_ip:serverPort, node_2_ip:serverPort,...recPort1, recPort2,...
 func main() {
-
+	Formatter := new(log.TextFormatter)
+    Formatter.TimestampFormat = "02-01-2006 15:04:05"
+    Formatter.FullTimestamp = true
+    log.SetFormatter(Formatter)
+	// Enable debug mode
+	// ll = log.DebugLevel
+	// log.SetLevel(ll)
+	
 	////////////////////////////////////////////////////
 	// Establish connection with all nodes and store a global mapping
 	// of name <host:port> <-> client object. We should also store a bit
 	// if they are alive or dead (dead being categorized by timeout or fail-stop)
 	// This makes sure we always make three conn (independent of number of client joining)
 	////////////////////////////////////////////////////
-
+	ip_port  = os.Args[1]
+	nodes,_ = strconv.Atoi(os.Args[2])
+	
+	// Populate node details
+	for i:= 3; i < nodes+3; i++{
+		address = append(address, os.Args[i])
+	}
+	for i:= nodes+3; i < len(os.Args); i++{
+		recPort = append(recPort, os.Args[i])
+	}
+	serverList          = make([]ServerInstance, nodes)
 	// Set up distinct connections to the servers.
 	log.Printf("Num nodes: %v\n", nodes)
 	for i := 0; i < nodes; i++ {
 		// TODO: Should we run servers as entirely different processes?
-		name := "localhost" + address[i]
+		name := address[i]
 		log.Printf("Server name: %v\n", name)
 
 		// Save into global data structures
@@ -566,13 +583,13 @@ func main() {
 	}
 
 	// Start the load balancer and listen for requests
-	lis, err := net.Listen("tcp", "localhost"+port)
+	lis, err := net.Listen("tcp", ip_port)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v\n", err)
 	}
 	lb := grpc.NewServer()
 
-	log.Println("Recover LB listening on port" + port)
+	log.Println("Recover LB listening on " + ip_port)
 
 	pb.RegisterRecoverKVServer(lb, &loadBalancer{})
 	pb.RegisterInternalServer(lb, &loadBalancerInternal{})

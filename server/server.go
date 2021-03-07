@@ -4,21 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"os"
 	"sync"
 	"time"
-
 	pb "recoverKV/gen/recoverKV"
-
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
-
 	"io"
 	"strings"
-
 	"google.golang.org/grpc"
+	log "github.com/sirupsen/logrus"
 )
 
 var ip_addr string
@@ -59,7 +55,7 @@ type server struct {
 // 				 ("", 1) if the key is absent
 func (s *server) GetValue(ctx context.Context, in *pb.InternalRequest) (*pb.InternalResponse, error) {
 	key := in.GetKey()
-	log.Printf("GetValue Received: %v\n", key)
+	log.Debugf("GetValue Received: %v\n", key)
 	var successCode int32 = 0
 
 	tableMu.Lock()
@@ -80,7 +76,7 @@ func (s *server) SetValue(ctx context.Context, in *pb.InternalRequest) (*pb.Inte
 	key := in.GetKey()
 	newVal := in.GetValue()
 	uid := in.GetQueryID()
-	log.Printf("SetValue Received: %v:%v\n", key, newVal)
+	log.Debugf("SetValue Received: %v:%v\n", key, newVal)
 	var successCode int32 = 0
 
 	tableMu.Lock()
@@ -144,17 +140,17 @@ func PrintStartMsg() {
 // Recovery request handler
 func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServer) error {
 	fmt.Println("[Recovery] Responding to server " + in.GetAddress())
-	log.Println("[Recovery] Responding to server " + in.GetAddress())
+	log.Info("[Recovery] Responding to server " + in.GetAddress())
 
 	var ferr int32
 	ferr = 0
 	// Parse the received missing UIDs from the recovering node
 	missingList := strings.Split(in.GetMissingUIDs(), "|")
-	log.Printf("Missing List received from peer: %v %v\n", missingList, in.GetMissingUIDs())
+	log.Infof("Missing List received from peer: %v %v\n", missingList, in.GetMissingUIDs())
 
 	// add a element with
 	for _, missingRange := range missingList {
-		log.Printf("Queries for range %v\n", missingRange)
+		log.Infof("Queries for range %v\n", missingRange)
 		// Extract the individual ranges
 		rangeBound := strings.Split(missingRange, "-")
 		// Can send multiple queries to the db here. But rather sending a single one.
@@ -162,13 +158,13 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServ
 		var tmpQuery string
 		for rows.Next() {
 			rows.Scan(&tmpQuery)
-			log.Printf("Found missing query %v\n", tmpQuery)
+			log.Infof("Found missing query %v\n", tmpQuery)
 			if tmpQuery == "" {
 				ferr = 1
 			}
 			resp := pb.RecResponse{Query: tmpQuery, FoundError: ferr}
 			if err := srv.Send(&resp); err != nil {
-				log.Printf("[Recovery] Send error %v", err)
+				log.Infof("[Recovery] Send error %v", err)
 			}
 		}
 	}
@@ -178,7 +174,7 @@ func (s server) FetchQueries(in *pb.RecRequest, srv pb.Internal_FetchQueriesServ
 func rpcRequestLogs(peer_addr string, global_uid int64, max_local_uid int64) (bool, error) {
 	// send query to DB
 	str, err := GetHolesInLogTable(global_uid, max_local_uid)
-	log.Printf("Missing Ranges: %v\n", str)
+	log.Infof("Missing Ranges: %v\n", str)
 
 	// Query failed
 	if err != nil {
@@ -190,7 +186,7 @@ func rpcRequestLogs(peer_addr string, global_uid int64, max_local_uid int64) (bo
 		return true, nil
 	}
 
-	log.Printf("Peer address to fetch from: %v\n", peer_addr)
+	log.Infof("Peer address to fetch from: %v\n", peer_addr)
 	// dial peer
 	conn, err := grpc.Dial(peer_addr, grpc.WithInsecure())
 	defer conn.Close()
@@ -216,22 +212,22 @@ func rpcRequestLogs(peer_addr string, global_uid int64, max_local_uid int64) (bo
 				return
 			}
 			if err != nil {
-				log.Printf("[Recovery] Cannot receive %v", err)
+				log.Infof("[Recovery] Cannot receive %v", err)
 				return
 			}
 			if resp.GetFoundError() == 1 {
-				log.Printf("[Recovery] Buddy server has an error.")
+				log.Infof("[Recovery] Buddy server has an error.")
 				return
 			}
 			if err := ApplyQuery(resp.GetQuery()); err != nil {
-				log.Printf("[Recovery] failed to apply query %s : ABORTING recovery.", resp.GetQuery())
+				log.Infof("[Recovery] failed to apply query %s : ABORTING recovery.", resp.GetQuery())
 			}
 			// fmt.Printf("[Recovery] Replayed query %s -- ", resp.GetQuery())
 		}
 	}()
 
 	if <-done {
-		log.Println("[Recovery] All queries are replayed now.")
+		log.Info("[Recovery] All queries are replayed now.")
 		// This return true does not guarantee all holes are filled.
 		return true, nil
 	}
@@ -240,17 +236,17 @@ func rpcRequestLogs(peer_addr string, global_uid int64, max_local_uid int64) (bo
 }
 
 func MarkMe(status int32) (int64, error) {
-	log.Printf("MarkMe: Start func\n")
+	log.Infof("MarkMe: Start func\n")
 	// Since MarkMe gets blocked at the load balancer until recovery is complete -- set a high timeout
 	privateCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	log.Printf("MarkMe: Sending RPC for %v\n", ip_serv_port)
+	log.Infof("MarkMe: Sending RPC for %v\n", ip_serv_port)
 	resp, err := LB.MarkMe(privateCtx, &pb.MarkStatus{ServerName: ip_serv_port, NewStatus: status})
 	if err != nil || privateCtx.Err() == context.DeadlineExceeded {
-		log.Println("[Recovery] MarkMe failed during recovery!", err)
+		log.Info("[Recovery] MarkMe failed during recovery!", err)
 		return 0, err
 	}
-	log.Printf("MarkMe: RPC returned %v\n", resp)
+	log.Infof("MarkMe: RPC returned %v\n", resp)
 	return resp.GetGlobalUID(), nil
 }
 
@@ -259,7 +255,7 @@ func FetchAlivePeers() (string, error) {
 	defer cancel()
 	resp, err := LB.FetchAlivePeers(privateCtx, &pb.ServerInfo{ServerName: ip_serv_port})
 	if err != nil {
-		log.Println("[Recovery] Fetching alive peers failed during recovery!")
+		log.Info("[Recovery] Fetching alive peers failed during recovery!")
 		return "", err
 	}
 	return resp.GetAliveList(), nil
@@ -289,7 +285,7 @@ func recoveryStage() {
 	// step 1
 	global_uid, err := MarkMe(0)
 	if err != nil {
-		log.Println("MarkMe failed so quiting!")
+		log.Info("MarkMe failed so quiting!")
 		return
 	}
 	fmt.Printf("Rec: MarkMe successful %v\n", global_uid)
@@ -297,28 +293,28 @@ func recoveryStage() {
 	// step 2
 	peers, err := FetchAlivePeers()
 	if err != nil {
-		log.Println("[Recovery] failed to fetch peers so quiting recovery!")
+		log.Info("[Recovery] failed to fetch peers so quiting recovery!")
 		return
 	}
-	log.Printf("Rec: alive peers successful %v\n", peers)
+	log.Infof("Rec: alive peers successful %v\n", peers)
 
 	peer_list := strings.Split(peers, ",")
 	if err != nil {
-		log.Println("[Recovery] Failed to get ALIVE peers or peer list is empty.")
+		log.Info("[Recovery] Failed to get ALIVE peers or peer list is empty.")
 		return
 	}
 
 	if len(peers) == 0 {
-		log.Printf("No alive peer\n")
+		log.Infof("No alive peer\n")
 		server_mode = "ALIVE"
 		if table.LoadKV(db_path, db) {
 			_, err := MarkMe(1)
 			if err != nil {
-				log.Println("[Recovery] rec complete but could not mark myself alive!")
+				log.Info("[Recovery] rec complete but could not mark myself alive!")
 				return
 			}
 			fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
-			log.Printf("KV Loaded\n")
+			log.Infof("KV Loaded\n")
 			return
 		}
 	}
@@ -335,7 +331,7 @@ func recoveryStage() {
 		// TODO: Add break here when number of holes requested
 		// 		is satisfied - can achieve this with a counter.
 	}
-	log.Printf("Rec: rpcRequestLogs successful %v\n", rec_success)
+	log.Infof("Rec: rpcRequestLogs successful %v\n", rec_success)
 
 	if rec_success {
 		// Recovery success
@@ -346,11 +342,11 @@ func recoveryStage() {
 		if table.LoadKV(db_path, db) {
 			_, err := MarkMe(1)
 			if err != nil {
-				log.Println("[Recovery] rec complete but could not mark myself alive!")
+				log.Info("[Recovery] rec complete but could not mark myself alive!")
 				return
 			}
 			fmt.Println("-- Server finished recovery stage, mode change: ZOMBIE->ALIVE --")
-			log.Printf("KV Loaded\n")
+			log.Infof("KV Loaded\n")
 			return
 		} else {
 			fmt.Println("Loading to memory failed == Failing server...bye.")
@@ -360,7 +356,7 @@ func recoveryStage() {
 		//		1. The healer failed during our recovery.
 		//		2. LOG replay failed for some reason.
 		// Try again from another server.
-		log.Println("[Recovery] Recovery failed because no healers to heal from")
+		log.Info("[Recovery] Recovery failed because no healers to heal from")
 	}
 }
 
@@ -387,12 +383,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	Formatter := new(log.TextFormatter)
+	Formatter.TimestampFormat = "02-01-2006 15:04:05"
+    Formatter.FullTimestamp = true
+	// Enable debug mode
+	//ll = log.DebugLevel
+	//log.SetLevel(ll)
+    log.SetFormatter(Formatter)
 	log.SetOutput(file)
 	defer file.Close()
 
 	//Client for LB
 	conn, err := grpc.Dial(ip_lb_port, grpc.WithInsecure(), grpc.WithBlock())
-	fmt.Println("ip_lb_port ", ip_lb_port)
+	//fmt.Println("ip_lb_port ", ip_lb_port)
 	defer conn.Close()
 	if err != nil {
 		log.Fatalf("[Load balancer] Failed to connect with peer %v : %v", ip_lb_port, err)
@@ -422,7 +425,7 @@ func main() {
 		PrintStartMsg()
 		go func() {
 			// Serving GET/PUT
-			log.Printf("Starting Server on serv port\n")
+			log.Infof("Starting Server on serv port\n")
 			if err := serv_s.Serve(serv_lis); err != nil {
 				log.Fatalf("Failed to serve GET/PUT: %v\n", err)
 			}
@@ -430,7 +433,7 @@ func main() {
 
 		// Serving recovery stage
 		go recoveryStage()
-		log.Printf("Starting Server on rec port\n")
+		log.Infof("Starting Server on rec port\n")
 		if err := rec_s.Serve(rec_lis); err != nil {
 			log.Fatalf("Failed to serve recover: %v\n", err)
 		}
