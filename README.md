@@ -14,7 +14,7 @@ cd server
 bash launch_system.sh
 ```
 
-It will start the servers at: `localhost:50051 localhost:50052 localhost:50053`
+The script will start the servers at: `localhost:50051 localhost:50052 localhost:50053`
 
 #### Using dynamic architecture
 For running flexible set of servers:
