@@ -12,9 +12,13 @@ protoc:
 build: server lb
 
 server:
-	go build -race -o recoverKV server.go persist.go
+	go build -o recoverKV server.go persist.go
 
 lb:
+	go build -o recoverLB load_balancer.go
+
+build_race:
+	go build -race -o recoverKV server.go persist.go
 	go build -race -o recoverLB load_balancer.go
 
 clean:
