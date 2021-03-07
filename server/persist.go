@@ -41,7 +41,7 @@ func init() {
 func InitDB(dbPath string) (*sql.DB, bool) {
 	database, err := sql.Open("sqlite3", dbPath)
 	if checkErr(err) {
-		log.Println("=== FAILED TO OPEN DB:", err.Error())
+		log.Error("=== FAILED TO OPEN DB:", err.Error())
 		return nil, false
 	}
 
@@ -49,7 +49,7 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		PRAGMA synchronous = NORMAL;
 		PRAGMA journal_mode = WAL;`)
 	if err != nil {
-		log.Println("=== PARGMA UPDATE FAILED:")
+		log.Error("=== PARGMA UPDATE FAILED:")
 		return nil, false
 	}
 
@@ -58,30 +58,30 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 
 	_, err = statement.Exec()
 	if checkErr(err) {
-		log.Println("=== STORE TABLE CREATION FAILED:", err.Error())
+		log.Error("=== STORE TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
 	prep_query = "REPLACE INTO store (key, value, uid) VALUES (?, ?, ?)"
 	updateStatement, err = database.Prepare(prep_query)
 	if checkErr(err) {
-		log.Println("=== UPDATE QUERY PREPATION FAILED:", err.Error())
+		log.Error("=== UPDATE QUERY PREPATION FAILED:", err.Error())
 		return nil, false
 	}
 	// Create log table
 	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS log (uid INT PRIMARY KEY, query TEXT)")
 	_, err = statement.Exec()
 	if checkErr(err) {
-		log.Println("=== LOG TABLE CREATION FAILED:", err.Error())
+		log.Error("=== LOG TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
 	prep_query_log = "REPLACE INTO log (uid, query) VALUES (?, ?)"
 	updateLogStatement, err = database.Prepare(prep_query_log)
 	if checkErr(err) {
-		log.Println("=== LOG UPDATE QUERY PREPATION FAILED:", err.Error())
+		log.Error("=== LOG UPDATE QUERY PREPATION FAILED:", err.Error())
 		return nil, false
 	}
 
-	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
+	log.Info("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
 	return database, true
 }
 
@@ -97,14 +97,14 @@ func UpdateKey(key string, value string, uid int64, database *sql.DB) bool {
 	_, err := updateStatement.Exec(key, value, uid)
 
 	if checkErr(err) {
-		log.Println("=== KEY UPDATE FAILED:", err.Error())
+		log.Error("=== KEY UPDATE FAILED:", err.Error())
 		return false
 	}
 
 	// Update log table now
 	_, err = updateLogStatement.Exec(uid, cur_query)
 	if checkErr(err) {
-		log.Println("=== LOG UPDATE FAILED:", err.Error())
+		log.Error("=== LOG UPDATE FAILED:", err.Error())
 		return false
 	}
 
@@ -115,7 +115,7 @@ func UpdateKey(key string, value string, uid int64, database *sql.DB) bool {
 func GetValue(key string, database *sql.DB) (string, bool) {
 	rows, err := database.Query("SELECT value FROM store WHERE key=?", key)
 	if checkErr(err) {
-		log.Println("=== KEY FETCH FAILED:", err.Error())
+		log.Error("=== KEY FETCH FAILED:", err.Error())
 		return "", false
 	}
 	defer rows.Close()
@@ -133,7 +133,7 @@ func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool {
 	rows, err :=
 		database.Query("SELECT key, value FROM store")
 	if checkErr(err) {
-		log.Println("=== DB LOAD FAILED:", err.Error())
+		log.Error("=== DB LOAD FAILED:", err.Error())
 		return false
 	}
 	defer rows.Close()
@@ -242,7 +242,7 @@ func GetHolesInLogTable(global_uid int64, max_local_uid int64) (string, error) {
 	WHERE b > a + 1`
 	rows, err := db.Query(query)
 	if checkErr(err) {
-		log.Println("[Recovery] Finding gaps in log table failed")
+		log.Error("[Recovery] Finding gaps in log table failed")
 		return "", err
 	}
 
@@ -252,7 +252,7 @@ func GetHolesInLogTable(global_uid int64, max_local_uid int64) (string, error) {
 	for rows.Next() {
 		err = rows.Scan(&least_prs_id, &max_prs_id)
 		if err != nil && err != sql.ErrNoRows {
-			log.Println("Error in GetHoles")
+			log.Error("Error in GetHoles")
 		}
 		if ret_str == "" {
 			ret_str += (least_prs_id + "-" + max_prs_id)
@@ -275,7 +275,7 @@ func GetMissingQueriesForPeer(start string, end string) *sql.Rows {
 	// be inclusive
 	rows, err := db.Query("SELECT query FROM log WHERE uid >=? AND uid <= ?", start, end)
 	if checkErr(err) {
-		log.Println("[Recovery] Finding gaps in log table failed")
+		log.Error("[Recovery] Finding gaps in log table failed")
 		return nil
 	}
 	return rows
