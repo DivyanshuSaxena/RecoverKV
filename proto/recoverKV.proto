@@ -25,12 +25,6 @@ service RecoverKV {
 
     // Function invoked for partitioning server instance
     rpc partitionServer (PartitionRequest) returns (Response) {}
-
-    // Mark server alive/zombie
-    rpc markMe (MarkStatus) returns (Ack) {}
-
-    // Fetch Alive peers of a server
-    rpc fetchAlivePeers (ServerInfo) returns (AlivePeersResponse) {}
 }
 
 // Defines the internal communication service
@@ -45,6 +39,18 @@ service Internal {
 
     // Function for stopping server
     rpc stopServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+    // Function for partition consistency
+    rpc partitionServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+
+    // Mark server alive/zombie
+    rpc markMe (MarkStatus) returns (Ack) {}
+
+    // Fetch Alive peers of a server
+    rpc fetchAlivePeers (ServerInfo) returns (AlivePeersResponse) {}
+
+    // Ping the server to check if the gRPC connection is alive
+    rpc pingServer (google.protobuf.Empty) returns (google.protobuf.Empty) {}
 }
 
 // The request message containing key
@@ -90,9 +96,8 @@ message InternalRequest {
 
 // The response message containing response
 message InternalResponse {
-  int64 queryID = 1;
-  string value = 2;
-  int32 successCode = 3;
+  string value = 1;
+  int32 successCode = 2;
 }
 
 message MarkStatus {
@@ -116,9 +121,8 @@ message Ack {
 // qLength  is number of queries needed by caller
 // fromId   is the last global uid as of last request from caller
 message RecRequest {
-    int32 qLength = 1;
-    int64 fromId = 2;
-    string address = 3;
+  string missingUIDs = 1;
+  string address = 2;
 }
 
 // query is the string of query with value.

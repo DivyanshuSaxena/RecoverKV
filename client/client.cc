@@ -225,7 +225,10 @@ int KV739Client::kv739_init(char **server_names)
             return -1;
         }
 
-        servers_list = servers_list + server_names[idx] + ",";
+        if (idx != 0) {
+            servers_list = servers_list + ",";
+        }
+        servers_list = servers_list + server_names[idx];
         idx += 1;
     }
 
@@ -238,7 +241,7 @@ int KV739Client::kv739_init(char **server_names)
     if (client->initLBState(client_id, servers_list) == -1)
     {
         cout << "[ERROR]"
-             << "Could not establish connection with server instances or lb" << endl;
+             << "Could not establish connection with server instances" << endl;
         return -1;
     }
 
@@ -369,7 +372,10 @@ int KV739Client::kv739_partition(char *server_name, char **reachable)
             return client->partitionServer(client_id, server_name, "");
         }
 
-        reachable_list = reachable_list + reachable[idx] + ",";
+        if (idx != 0) {
+            reachable_list = reachable_list + ",";
+        }
+        reachable_list = reachable_list + reachable[idx];
         idx += 1;
     }
 

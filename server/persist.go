@@ -2,32 +2,39 @@ package main
 
 import (
 	"database/sql"
-	"log"
+	"errors"
+	"fmt"
 	"os"
-
-	_ "github.com/mattn/go-sqlite3"
-	"strings"
-    "strconv"
 	"regexp"
-	"bufio"
+	"strconv"
+	"strings"
+	_ "github.com/mattn/go-sqlite3"
+	log "github.com/sirupsen/logrus"
 )
 
 var prep_query string
-/*
-* log path changes every time server restarts,
-* so to keep it unique let's use UNIX timestamp.
-*/
-log_path := "./log/"+strconv.Itoa(int(time.Now().Unix()))
-var flog *os.File
+var prep_query_log string
 
 //type MyMap map[string]string
 
+var updateStatement *sql.Stmt
+var updateLogStatement *sql.Stmt
+
 func init() {
-	file, err := os.OpenFile("server.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err := os.OpenFile("server"+serv_port+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.SetOutput(file)
+	Formatter := new(log.TextFormatter)
+	Formatter.TimestampFormat = "02-01-2006 15:04:05"
+    Formatter.FullTimestamp = true
+    log.SetFormatter(Formatter)
+	log.SetOutput(file)
+	// Enable debug mode
+	//ll = log.DebugLevel
+	//log.SetLevel(ll)
+	defer file.Close()
 }
 
 // InitDB initializes DB at the dbPath
@@ -51,7 +58,7 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 
 	_, err = statement.Exec()
 	if checkErr(err) {
-		log.Println("=== TABLE CREATION FAILED:", err.Error())
+		log.Println("=== STORE TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
 	prep_query = "REPLACE INTO store (key, value, uid) VALUES (?, ?, ?)"
@@ -60,19 +67,32 @@ func InitDB(dbPath string) (*sql.DB, bool) {
 		log.Println("=== UPDATE QUERY PREPATION FAILED:", err.Error())
 		return nil, false
 	}
-	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
-
-	flog, err := os.OpenFile(log_path, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	// Create log table
+	statement, _ = database.Prepare("CREATE TABLE IF NOT EXISTS log (uid INT PRIMARY KEY, query TEXT)")
+	_, err = statement.Exec()
 	if checkErr(err) {
-		log.Println("=== LOG file creation failed")
+		log.Println("=== LOG TABLE CREATION FAILED:", err.Error())
 		return nil, false
 	}
+	prep_query_log = "REPLACE INTO log (uid, query) VALUES (?, ?)"
+	updateLogStatement, err = database.Prepare(prep_query_log)
+	if checkErr(err) {
+		log.Println("=== LOG UPDATE QUERY PREPATION FAILED:", err.Error())
+		return nil, false
+	}
+
+	log.Println("=== DB ", dbPath, " SUCCESSFULLY INITIALIZED ===")
 	return database, true
 }
 
 // UpdateKey updates the `value` for `key` in DB.
 // It also stores the uid of last query that modified it.
-func UpdateKey(key string, value string, int64 uid, database *sql.DB) bool {
+func UpdateKey(key string, value string, uid int64, database *sql.DB) bool {
+
+	// Prepare query for log file
+	cur_query := strings.Replace(prep_query, "?", fmt.Sprintf("'%v'", key), 1)
+	cur_query = strings.Replace(cur_query, "?", fmt.Sprintf("'%v'", value), 1)
+	cur_query = strings.Replace(cur_query, "?", strconv.FormatInt(uid, 10), 1)
 
 	_, err := updateStatement.Exec(key, value, uid)
 
@@ -81,14 +101,10 @@ func UpdateKey(key string, value string, int64 uid, database *sql.DB) bool {
 		return false
 	}
 
-	// Prepare query for log file
-    cur_query := strings.Replace(prep_query, "?", fmt.Sprintf("'%v'", val1), 1)
-    cur_query = strings.Replace(cur_query, "?", fmt.Sprintf("'%v'", val2), 1)
-    cur_query = strings.Replace(cur_query, "?", strconv.FormatInt(val3, 10), 1)
-	
-	// TODO: Make this a routine? Might affect correctness.
-	if !logQuery(cur_query) {
-		log.Println("=== LOG UPDATE FAILED for Key", key)
+	// Update log table now
+	_, err = updateLogStatement.Exec(uid, cur_query)
+	if checkErr(err) {
+		log.Println("=== LOG UPDATE FAILED:", err.Error())
 		return false
 	}
 
@@ -126,7 +142,9 @@ func (table *BigMAP) LoadKV(dbPath string, database *sql.DB) bool {
 	var value string
 	for rows.Next() {
 		rows.Scan(&key, &value)
+		tableMu.Lock()
 		(*table)[key] = value
+		tableMu.Unlock()
 	}
 
 	return true
@@ -141,113 +159,124 @@ func checkErr(err error) bool {
 	return false
 }
 
-// Return the last UID
-func FetchLocalUID(path string) int64 {
-    st,err := database.QueryRow("SELECT MAX(uid) FROM store")
-	if err != nil {
-		log.Println)"[Recovery] failed during query FetchLocalUID"
+func trimQuotes(s string) string {
+	if len(s) >= 2 {
+		if c := s[len(s)-1]; s[0] == c && (c == '"' || c == '\'') {
+			return s[1 : len(s)-1]
+		}
 	}
-    var luid string
-    st.Scan(&luid)
-    return int64(luid)
-}
-
-// Logs query to a log file. Each query will be on a single line.
-func logQuery(query string) bool {
-	if _, err = flog.WriteString(query+"\n"); err != nil {
-		return false
-  }
-  return true
+	return s
 }
 
 // Apply a given query if it's latest for the key.
 // return false only if failed applying.
-func ApplyQuery(query string) bool {
+func ApplyQuery(query string) error {
 	//fetch the uid of the query,
 	tmp := strings.SplitN(query, " ", -1)
+
 	// Get last element and remove '(),' from it.
 	var re = regexp.MustCompile(`(^\(|\)|,)`)
-    quid := int64(re.ReplaceAllString(tmp[len(tmp)-1],""))
-	qval := re.ReplaceAllString(tmp[len(tmp)-2],"")
-	qkey := re.ReplaceAllString(tmp[len(tmp)-3],"")
-	
+	quidStr, _ := strconv.Atoi(re.ReplaceAllString(tmp[len(tmp)-1], ""))
+	quid := int64(quidStr)
+	qval := re.ReplaceAllString(tmp[len(tmp)-2], "")
+	qkey := re.ReplaceAllString(tmp[len(tmp)-3], "")
+
+	qval = trimQuotes(qval)
+	qkey = trimQuotes(qkey)
+
 	// check with db and see if quid is larger,
-	row := db.QueryRow("SELECT key FROM store WHERE key=? AND uid>?", qkey, quid)
+	row := db.QueryRow("SELECT key FROM store WHERE key=? AND uid > ?", qkey, quid)
 	var tmpkey string
-	row.Scan(&tmpkey)
-	if tmpkey == "" {
+	err := row.Scan(&tmpkey)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if tmpkey == "" || err == sql.ErrNoRows {
+
 		// if either key does not exist or uid < quid, so need to update db and push to log.
 		// Just invoke updateKey for now.
 		if UpdateKey(qkey, qval, quid, db) {
-			return true
+			return nil
 		}
-		return false
+
+		return errors.New("ApplyQuery: Failed to update key")
 		// ADDON: This could be improved by applying the query directly
 	} else {
 		// uid > quid means key in db is latest so don't apply query.
-		return true
+		return nil
 	}
-	return false
-
-	//TODO: Add logs to this function
+	return errors.New("ApplyQuery: Failed to update key")
 }
 
-// Searches uid for a given file and returns that line
-func searchFile(uid int64, filepath string) string{
-	var squery string
-	f, err := os.Open(filepath)
-	if err != nil {
-		log.Println("[Recovery] Failed to open file during searchFile"+filepath+":"+err)
-		return ""
-	}
-	defer f.Close()
+func FetchMaxLocalUID() int64 {
+	st := db.QueryRow("SELECT MAX(uid) FROM store")
+	var luid string
+	st.Scan(&luid)
+	tmp, _ := strconv.Atoi(luid)
+	return int64(tmp)
+}
 
-	// Splits on newlines by default.
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		if strings.Contains(scanner.Text(), strconv.Itoa(uid)) {
-			squery = scanner.Text()
-			break
+// Check the holes-finding-SQL query here
+// Return type: [Max Available QueryID - Next Least Available QueryID]
+func GetHolesInLogTable(global_uid int64, max_local_uid int64) (string, error) {
+	log.Printf("Get Holes: Global uid %v\n", global_uid)
+	log.Printf("Get Holes: Max local uid %v\n", max_local_uid)
+
+	// if first time, then just return
+	if global_uid == 0 {
+		return "", nil
+	}
+
+	// If local uid = global uid, simply return. No need for db queries
+	if max_local_uid == global_uid {
+		return "", nil
+	}
+
+	// find holes in log table (not data table)
+	query := `
+	SELECT a AS id, b AS next_id FROM (
+		SELECT a1.uid AS a , MIN(a2.uid) AS b
+		FROM log AS a1 LEFT JOIN log AS a2
+			ON a2.uid > a1.uid
+		GROUP BY a1.uid) AS tab
+	WHERE b > a + 1`
+	rows, err := db.Query(query)
+	if checkErr(err) {
+		log.Println("[Recovery] Finding gaps in log table failed")
+		return "", err
+	}
+
+	ret_str := ""
+	var least_prs_id string
+	var max_prs_id string
+	for rows.Next() {
+		err = rows.Scan(&least_prs_id, &max_prs_id)
+		if err != nil && err != sql.ErrNoRows {
+			log.Println("Error in GetHoles")
+		}
+		if ret_str == "" {
+			ret_str += (least_prs_id + "-" + max_prs_id)
+		} else {
+			ret_str += ("|" + least_prs_id + "-" + max_prs_id)
 		}
 	}
+	log.Printf("Get Holes: Evaluated missing ranges %v\n", ret_str)
 
-	if err := scanner.Err(); err != nil {
-		// Handle the error
-		log.Println("[Recovery] Error in scanner searchFile"+filepath+":"+err)
-		return ""
+	// This is to ensure there aren't any trailing holes upto global UID.
+	if ret_str == "" {
+		return fmt.Sprintf("%d-%d", max_local_uid, (global_uid + 1)), nil
 	}
-	return ""
+	ret_str += fmt.Sprintf("|%d-%d", max_local_uid, (global_uid + 1))
+	return ret_str, nil
 }
 
-
-// Searches the entire log file for uid and returns that line.
-// How many log files should this search, in what order
-func SearchQueryLog(uid int64) string{
-	// It'll begin by searching the current log.
-	dir := "./log/"
-	files, err := ioutil.ReadDir(dir)
-	// A list of recently modified files in log dir
-	sort.Slice(files, func(i,j int) bool{
-		return files[i].ModTime().Unix() < files[j].ModTime().Unix()
-	})
-	// Now iterate over each and check for uid
-	for _, file := range files {
-		filepath := "./log/"+file.Name()
-		query = searchFile(filepath)
-		if query != "" {
-			return query
-			break
-		}
+// Check the peer-find-relevant-qids query here
+func GetMissingQueriesForPeer(start string, end string) *sql.Rows {
+	// be inclusive
+	rows, err := db.Query("SELECT query FROM log WHERE uid >=? AND uid <= ?", start, end)
+	if checkErr(err) {
+		log.Println("[Recovery] Finding gaps in log table failed")
+		return nil
 	}
-	return ""
-	/**
-	* ADDON: Multiple threads can divide the recency file list and 
-	*		search in parallel to find the uid soon.
-	*/
+	return rows
 }
-
-
-
-// All data is written twice, so compaction is important.
-// TODO: One fine day
-func compactLogs(path string) bool
