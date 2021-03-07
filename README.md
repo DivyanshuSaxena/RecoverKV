@@ -4,6 +4,18 @@ A strongly consistent distributed KV store.
 ## Instructions for Partner team
 
 ### Starting load balancer and servers
+
+#### Using fixed architecture
+For running the three-node fixed architecture please use the `launch_system.sh` file:
+```bash
+cd server
+
+# Start three backend server and lb
+bash launch_system.sh
+```
+
+#### Using dynamic architecture
+For running flexible set of servers:
 ```bash
 cd server
 
@@ -23,7 +35,7 @@ cd server
 
 ```
 
-Note: Before starting the tests, give load balancer a few seconds to register all the servers on startup.
+Note: Before starting the tests, give load balancer a few seconds to register all the servers on startup. Currently, we only support one load balancer.
 
 ### Client Interface Testing
 The client interface implements the methods to access the key/value server instance, based on GRPC protocol. Each client is an instance of the `KV739Client` class, the
@@ -34,9 +46,9 @@ Therefore, you will have to modify your testing script, to create an instance of
 \##Example Usage: (with respect to above started servers)\
 You will be passing `localhost:50051 localhost:50052 localhost:50053` server addresses to your testing scripts.
 
-Note: In the tests, after killing a server please give it 4-5 seconds to recover back to consistent state.
+Note: In the tests, after killing a server please give it >5 seconds to recover back to consistent state.
 
-## For Developers
+## Instructions for Developers
 ```bash
 cd /server/
 #go mod tidy
