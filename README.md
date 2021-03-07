@@ -1,6 +1,42 @@
 # RecoverKV
 A strongly consistent distributed KV store.
-## Starting load balancer and srevers
+
+## Instructions for Partner team
+
+### Starting load balancer and servers
+```bash
+cd server
+
+# start a server
+./run_server.sh <server ip> <server port> <recovery port> <LB ip> <LB port> 1
+
+# #Example Usage: For starting three servers on localhost
+./run_server.sh localhost 50051 50054 localhost 50050 1
+./run_server.sh localhost 50052 50055 localhost 50050 1
+./run_server.sh localhost 50053 50056 localhost 50050 1
+
+# Then start the load balancer
+./recoverLB <ip_addr:port> <number of servers> <server 1 ip:port> <server 2 ip:port> ... <server 1s recovery port> <server 2s recovery port> ...
+
+## Example Usage: (with respect to above started servers)
+./recoverLB localhost:50050 3 localhost:50051 localhost:50052 localhost:50053 50054 50055 50056
+
+```
+
+Note: Before starting the tests, give load balancer a few seconds to register all the servers on startup.
+
+### Client Interface Testing
+The client interface implements the methods to access the key/value server instance, based on GRPC protocol. Each client is an instance of the `KV739Client` class, the
+exact methods implemented can be found in `client/client.h`.
+
+Therefore, you will have to modify your testing script, to create an instance of `KV739Client` class and then call API methods.
+
+\##Example Usage: (with respect to above started servers)\
+You will be passing `localhost:50051 localhost:50052 localhost:50053` server addresses to your testing scripts.
+
+Note: In the tests, after killing a server please give it 4-5 seconds to recover back to consistent state.
+
+## For Developers
 ```bash
 cd /server/
 #go mod tidy
@@ -29,7 +65,7 @@ exact methods implemented can be found in `client/client.h`.
 
 For compilation, the scripts assume that GRPC C++ Plugin libraries are installed in `/usr/local`, or are added on to the `$PATH` environment variable.
 
-### Developer
+### Build
 
 Run `make` inside the `client/` directory to generate a new `lib739kv.so`. This shared object file can then be used in any C/C++ application.
 
