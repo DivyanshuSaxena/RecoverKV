@@ -42,7 +42,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(num_clients)
 ax.legend()
 
-plt.show()
+plt.savefig('multi_latency.png')
 
 
 fig, ax = plt.subplots()
@@ -56,4 +56,4 @@ ax.set_xticks(x)
 ax.set_xticklabels(num_clients)
 ax.legend()
 
-plt.show()
+plt.savefig('multi_thrput.png')

@@ -37,7 +37,7 @@ for fil in simple:
     plt.title('Latency CDF (' + fil.split("_")[1] + ')')
     plt.xlabel('Latency (in ms)')
     plt.legend()
-    plt.show()
+    plt.savefig('latency_cdf_' + fil.split("_")[1] + '.png')
 
 # Get the performance of reads and writes when error occurred
 for fil in error:
@@ -68,7 +68,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(num_keys)
 ax.legend()
 
-plt.show()
+plt.savefig('put_throughput.png')
 
 fig, ax = plt.subplots()
 ax.bar(x-0.15, data['reads'], color='b', width=0.3, label='Plain Gets')
@@ -81,4 +81,4 @@ ax.set_xticks(x)
 ax.set_xticklabels(num_keys)
 ax.legend()
 
-plt.show()
+plt.savefig('get_throughput.png')
