@@ -119,22 +119,38 @@ void test_performance_async_reads(KV739Client *client, vector<double> &times,
 
 int main(int argc, char *argv[]) {
   int tests_passed = 0;
+  int total_servers = 0;
 
-  // get server name from command line
-  char *server_name = argv[1];
+  if (argc < 4) {
+    cout << "Format: ./multiperf_test <num-keys> <pool-size> <ip-addr:port of "
+            "atleast two servers"
+         << endl;
+    return 0;
+  }
 
   // get the number of keys from the command line
-  int num_keys = atoi(argv[2]);
+  int num_keys = atoi(argv[1]);
+  cout << "Number of keys: " << num_keys << endl;
 
   // get thread pool size for multi-threaded performance test
-  int pool_size = atoi(argv[3]);
+  int pool_size = atoi(argv[2]);
+
+  // get server names from command line
+  char **serverNames = new char *[argc - 1];
+  for (int i = 3; i < argc; i++) {
+    serverNames[i - 3] = new char[strlen(argv[i])];
+    total_servers++;
+    strncpy(serverNames[i - 3], argv[i], strlen(argv[i]));
+  }
+  serverNames[argc - 2] = NULL;
+  cout << "Created server name list" << endl;
 
   // construct clients for each thread
   vector<shared_ptr<KV739Client>> clients;
   for (int i = 0; i < pool_size; i++) {
     shared_ptr<KV739Client> client_ptr(new KV739Client());
     // intialize connection to server
-    if (client_ptr->kv739_init(server_name) == -1) {
+    if (client_ptr->kv739_init(serverNames) == -1) {
       return 0;
     }
     clients.push_back(client_ptr);

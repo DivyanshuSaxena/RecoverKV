@@ -36,7 +36,7 @@ client.o: client.cc
 %.pb.cc: %.proto
 	protoc -I $(PROTOS_PATH) --cpp_out=. $<
 
-test: correctness_test performance_test
+test: correctness_test performance_test multiperf_test
 
 performance_test: tests/performance_test.cc
 	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
