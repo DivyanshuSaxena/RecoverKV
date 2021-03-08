@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Update the number of keys here
-num_keys = [100, 200]
+num_keys = [10000, 20000, 50000, 100000]
 simple = ['simple_reads_', 'simple_writes_']
 error = ['recover_reads_', 'recover_writes_']
 
@@ -38,6 +38,7 @@ for fil in simple:
     plt.xlabel('Latency (in ms)')
     plt.legend()
     plt.savefig('latency_cdf_' + fil.split("_")[1] + '.png')
+    plt.close()
 
 # Get the performance of reads and writes when error occurred
 for fil in error:

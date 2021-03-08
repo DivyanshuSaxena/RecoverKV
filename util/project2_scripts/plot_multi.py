@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Update number of clients here
-num_clients = [1, 2]
+num_clients = [10, 15, 20, 25, 30, 40]
 multi = ['multi_reads_', 'multi_writes_']
 
 path = sys.argv[1]
@@ -26,7 +26,7 @@ for fil in multi:
 
         latency = float(summary[0].split(':')[1].strip()[:-2])
         throughput = float(summary[1].split(':')[1].strip()[:-2])
-        latency_data[fil.split('_')[1]].append(throughput)
+        latency_data[fil.split('_')[1]].append(latency)
         thrput_data[fil.split('_')[1]].append(throughput)
 
 x = np.arange(len(num_clients))
