@@ -71,7 +71,7 @@ void latency_results(vector<double> &time, std::string name) {
 
 // TESTS AND RUNS ANALYSIS OVER A SINGLE ROUND OF WRITES
 int test_performance_simple_writes(KV739Client *client, bool compile_results,
-                                   int kill_key = -1,
+                                   string name, int kill_key = -1,
                                    char *server_name = NULL) {
   // Temporary variable to read oldvalue
   char *old_value = new char[VALUE_SIZE + 1];
@@ -107,15 +107,15 @@ int test_performance_simple_writes(KV739Client *client, bool compile_results,
 
   // Call analysis function
   if (compile_results) {
-    latency_results(times, "simple_write");
+    latency_results(times, name);
   }
 
   return 1;
 }
 
 // TESTS AND RUNS ANALYSIS OVER A SINGLE ROUND OF READS
-int test_performance_simple_reads(KV739Client *client, int kill_key = -1,
-                                  char *server_name = NULL) {
+int test_performance_simple_reads(KV739Client *client, string name,
+                                  int kill_key = -1, char *server_name = NULL) {
   // Temporary variable to read value
   char *value = new char[VALUE_SIZE + 1];
 
@@ -151,7 +151,7 @@ int test_performance_simple_reads(KV739Client *client, int kill_key = -1,
   }
 
   // Call analysis function
-  latency_results(times, "simple_read");
+  latency_results(times, name);
 
   return 1;
 }
@@ -192,8 +192,10 @@ int main(int argc, char *argv[]) {
   // generate key-value pairs
   generate_keys(num_keys);
 
-  tests_passed += test_performance_simple_writes(client, true);
-  tests_passed += test_performance_simple_reads(client);
+  tests_passed += test_performance_simple_writes(
+      client, true, "simple_writes_" + to_string(num_keys));
+  tests_passed += test_performance_simple_reads(
+      client, "simple_reads_" + to_string(num_keys));
 
   string proceed;
   cout << "Performance statistics for simple write and read workloads done. "
@@ -213,10 +215,12 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  tests_passed += test_performance_simple_writes(client, true, num_keys / 4,
-                                                 serverNames[0]);
-  tests_passed +=
-      test_performance_simple_reads(client, num_keys / 4, serverNames[1]);
+  tests_passed += test_performance_simple_writes(
+      client, true, "recover_writes_" + to_string(num_keys), num_keys / 4,
+      serverNames[0]);
+  tests_passed += test_performance_simple_reads(
+      client, "recover_reads_" + to_string(num_keys), num_keys / 4,
+      serverNames[1]);
 
   // free state and disconnect from server
   client->kv739_shutdown();

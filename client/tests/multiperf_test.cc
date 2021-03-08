@@ -195,8 +195,10 @@ int main(int argc, char *argv[]) {
   end = high_resolution_clock::now();
   duration_reads = duration_cast<duration<double, std::milli>>(end - start);
 
-  latency_results(write_times, "multi_writes", duration_writes.count());
-  latency_results(read_times, "multi_reads", duration_reads.count());
+  latency_results(write_times, "multi_writes_" + to_string(pool_size),
+                  duration_writes.count());
+  latency_results(read_times, "multi_reads_" + to_string(pool_size),
+                  duration_reads.count());
 
   // free state and disconnect all clients from server
   for (auto client_ptr : clients) {
