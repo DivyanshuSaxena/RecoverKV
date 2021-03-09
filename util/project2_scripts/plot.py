@@ -17,6 +17,8 @@ recover_data = {'reads': [], 'writes': []}
 
 # Read the simple reads and writes
 for fil in simple:
+    fig, ax = plt.subplots()
+
     for it in range(len(num_keys)):
         key = num_keys[it]
         with open(path + '/' + fil + str(key) + '.log') as f:
@@ -32,13 +34,13 @@ for fil in simple:
         cum_vt = np.cumsum(vt).astype(float)
         cum_vt /= cum_vt[-1]
 
-        plt.plot(bt[:-1], cum_vt, '-.', label=str(key))
+        ax.plot(bt[:-1], cum_vt, '-.', label=str(key))
 
-    plt.title('Latency CDF (' + fil.split("_")[1] + ')')
-    plt.xlabel('Latency (in ms)')
-    plt.legend()
+    ax.set_title('Latency CDF (' + fil.split("_")[1] + ')')
+    ax.set_xlabel('Latency (in ms)')
+    ax.set_xscale('log', basex=2)
+    ax.legend()
     plt.savefig('latency_cdf_' + fil.split("_")[1] + '.png')
-    plt.close()
 
 # Get the performance of reads and writes when error occurred
 for fil in error:

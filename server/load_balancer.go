@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"net"
 	"os"
@@ -71,6 +72,7 @@ type serverNameMAP map[string]int
 var (
 	queryID       int64 = 0
 	queryIDMu           = sync.Mutex{}
+	queryTimeMu         = sync.Mutex{}
 	clientMap           = make(clientMAP)
 	serverNameMap       = make(serverNameMAP)
 	serverList    []ServerInstance
@@ -94,7 +96,9 @@ type setValueChan struct {
 	code     int32
 }
 
-const concurrentPuts bool = false
+const concurrentPuts bool = true
+
+var queryFile *os.File
 
 // CanContactServer checks whether a given clientID can contact the given server.
 // Returns 1 if it can, 0 if not. And returns -1 if clientID is invalid.
@@ -415,6 +419,8 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
 
+	funcStart := time.Now()
+
 	var successCode int32 = 0
 	var val string = "NULL"
 
@@ -545,6 +551,9 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 			}
 		}
 	}
+	funcElapsed := time.Since(funcStart)
+	writeString := fmt.Sprintf("%v\n", funcElapsed)
+	queryFile.WriteString(writeString)
 
 	log.Debugf("SetValue successful puts: %v\n", successfulPuts)
 	if successfulPuts > 0 {
@@ -680,6 +689,10 @@ func main() {
 		s := ServerInstance{serverID: i, name: name, conn: c, recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
 		serverList[i] = s
 	}
+
+	// Open file for writing
+	queryFile, _ = os.Create("/tmp/" + ip_port)
+	defer queryFile.Close()
 
 	// Start the load balancer and listen for requests
 	lis, err := net.Listen("tcp", ip_port)
