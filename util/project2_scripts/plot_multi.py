@@ -29,11 +29,13 @@ for fil in multi:
         latency_data[fil.split('_')[1]].append(latency)
         thrput_data[fil.split('_')[1]].append(throughput)
 
+print(latency_data, thrput_data)
+
 x = np.arange(len(num_clients))
 
 fig, ax = plt.subplots()
-ax.plot(latency_data['reads'], 'b-*', label='Put')
-ax.plot(latency_data['writes'], 'g-^', label='Get')
+ax.plot(latency_data['reads'], 'b-*', label='Get')
+ax.plot(latency_data['writes'], 'g-^', label='Put')
 
 ax.set_ylabel('Latency (in ms)')
 ax.set_xlabel('Number of concurrent clients')
@@ -44,10 +46,9 @@ ax.legend()
 
 plt.savefig('multi_latency.png')
 
-
 fig, ax = plt.subplots()
-ax.plot(thrput_data['reads'], 'b-*', label='Put')
-ax.plot(thrput_data['writes'], 'g-^', label='Get')
+ax.plot(thrput_data['reads'], 'b-*', label='Get')
+ax.plot(thrput_data['writes'], 'g-^', label='Put')
 
 ax.set_ylabel('Throughput (requests per second)')
 ax.set_xlabel('Number of concurrent clients')

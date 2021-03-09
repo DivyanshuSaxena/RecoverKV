@@ -28,12 +28,12 @@ for fil in simple:
         throughput = float(summary[1].split(':')[1].strip()[:-2])
         data[fil.split('_')[1]].append(throughput)
 
-        vt, bt = np.histogram(timings, bins=key)
+        vt, bt = np.histogram(timings, bins=100)
         cum_vt = np.cumsum(vt).astype(float)
         cum_vt /= cum_vt[-1]
 
-        plt.plot(bt[:-1], cum_vt, label=str(key))
-    
+        plt.plot(bt[:-1], cum_vt, '-.', label=str(key))
+
     plt.title('Latency CDF (' + fil.split("_")[1] + ')')
     plt.xlabel('Latency (in ms)')
     plt.legend()
@@ -59,12 +59,17 @@ print(data, recover_data)
 x = np.arange(len(num_keys))
 
 fig, ax = plt.subplots()
-ax.bar(x-0.1, data['writes'], color='b', width=0.2, label='Plain Puts')
-ax.bar(x+0.1, recover_data['writes'], color='g', width=0.2, label='Recover Puts')
+ax.bar(x - 0.1, data['writes'], color='b', width=0.2, label='Plain Puts')
+ax.bar(x + 0.1,
+       recover_data['writes'],
+       color='g',
+       width=0.2,
+       label='Recover Puts')
 
 ax.set_ylabel('Throughput')
 ax.set_xlabel('Number of keys')
-ax.set_title('Throughput of Put operations under normal and failure conditions')
+ax.set_title(
+    'Throughput of Put operations under normal and failure conditions')
 ax.set_xticks(x)
 ax.set_xticklabels(num_keys)
 ax.legend()
@@ -72,12 +77,17 @@ ax.legend()
 plt.savefig('put_throughput.png')
 
 fig, ax = plt.subplots()
-ax.bar(x-0.15, data['reads'], color='b', width=0.3, label='Plain Gets')
-ax.bar(x+0.15, recover_data['reads'], color='g', width=0.3, label='Recover Gets')
+ax.bar(x - 0.15, data['reads'], color='b', width=0.3, label='Plain Gets')
+ax.bar(x + 0.15,
+       recover_data['reads'],
+       color='g',
+       width=0.3,
+       label='Recover Gets')
 
 ax.set_ylabel('Throughput')
 ax.set_xlabel('Number of keys')
-ax.set_title('Throughput of Get operations under normal and failure conditions')
+ax.set_title(
+    'Throughput of Get operations under normal and failure conditions')
 ax.set_xticks(x)
 ax.set_xticklabels(num_keys)
 ax.legend()
