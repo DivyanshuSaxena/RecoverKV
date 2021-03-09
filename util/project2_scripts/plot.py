@@ -10,6 +10,9 @@ num_keys = [10000, 20000, 50000, 100000]
 simple = ['simple_reads_', 'simple_writes_']
 error = ['recover_reads_', 'recover_writes_']
 
+total_times = {'reads': [0] * len(num_keys), 'writes': [0] * len(num_keys)}
+server_times = {'reads': [0] * len(num_keys), 'writes': [0] * len(num_keys)}
+
 path = sys.argv[1]
 
 data = {'reads': [], 'writes': []}
@@ -26,6 +29,7 @@ for fil in simple:
         timings = content[:-2]
         timings = [float(x.strip()) for x in timings]
         summary = content[-2:]
+        total_times[fil.split('_')[1]][it] = sum(timings)
 
         throughput = float(summary[1].split(':')[1].strip()[:-2])
         data[fil.split('_')[1]].append(throughput)
@@ -39,8 +43,23 @@ for fil in simple:
     ax.set_title('Latency CDF (' + fil.split("_")[1] + ')')
     ax.set_xlabel('Latency (in ms)')
     ax.set_xscale('log', basex=2)
+    ax.set_ylim(0, 1)
     ax.legend()
     plt.savefig('latency_cdf_' + fil.split("_")[1] + '.png')
+
+# Get the time recorded by the server
+for it in range(len(num_keys)):
+    key = num_keys[it]
+    with open(path + '/' + 'lb' + str(key)) as f:
+        content = f.readlines()
+    content = [x.strip() for x in content]
+    total_time = 0
+    for timing in content:
+        if timing[-2:] == 'ms':
+            total_time += float(timing[:-2])
+        else:
+            total_time += float(timing[:-2])/1000
+    server_times['writes'][it] = total_time
 
 # Get the performance of reads and writes when error occurred
 for fil in error:
@@ -59,6 +78,22 @@ print(data, recover_data)
 
 # Plot the plain vs recover graph
 x = np.arange(len(num_keys))
+
+fig, ax = plt.subplots()
+diff_bars = [(j-i) / j * 100 for i,j in zip(server_times['writes'], total_times['writes'])]
+server_bars = [i / j * 100 for i,j in zip(server_times['writes'], total_times['writes'])]
+ax.bar(x, server_bars, align='center', width=0.3, label='Time within our system')
+ax.bar(x, diff_bars, align='center', width=0.3, bottom=server_bars, label='Total Time registered by Client')
+
+ax.set_ylabel('Fraction')
+ax.set_xlabel('Number of keys')
+ax.set_title(
+    'Fraction of total time taken within server, and Overheads')
+ax.set_xticks(x)
+ax.set_xticklabels(num_keys)
+ax.legend()
+
+plt.savefig('compare_throughput.png')
 
 fig, ax = plt.subplots()
 ax.bar(x - 0.1, data['writes'], color='b', width=0.2, label='Plain Puts')
