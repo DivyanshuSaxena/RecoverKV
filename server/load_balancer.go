@@ -150,7 +150,8 @@ func Redial(serverID int) {
 	if err != nil {
 		log.Fatalf("did not connect: %v\n", err)
 	}
-	serverList[serverID].conn = pb.NewInternalClient(conn)
+	// NOTE: Incorrect connection here.
+	serverList[serverID].routerConn = pb.NewInternalClient(conn)
 }
 
 // StartServer startes the server with serverId given
@@ -173,6 +174,7 @@ func StartServer(serverID int) {
 }
 
 func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionRequest) (*pb.Response, error) {
+	// Method deprecated now. No longer support partitioning from the client.
 
 	var successCode int32 = 0
 
@@ -235,7 +237,8 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 		defer cancel()
 		emptyMsg := new(emptypb.Empty)
 
-		_, err := serverList[serverID].conn.PartitionServer(privateCtx, emptyMsg)
+		// NOTE: Incorrect connection here - method deprecated for now.
+		_, err := serverList[serverID].routerConn.PartitionServer(privateCtx, emptyMsg)
 		// check it it exists, if not successCode = -1
 		if err != nil || privateCtx.Err() == context.DeadlineExceeded {
 			// Revert back to old blocked peers
@@ -251,7 +254,14 @@ func (lb *loadBalancer) PartitionServer(ctx context.Context, in *pb.PartitionReq
 }
 
 func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb.Response, error) {
+	// Method executed by Master
 
+	// If call received here: then, this instance must be the Master. If not -- send error
+	if masterLB != backend {
+		return &pb.Response{Value: strconv.Itoa(masterLB), SuccessCode: 2}, errors.New("node not master")
+	}
+
+	// Following logic -- executed by the Master LB
 	var successCode int32 = 0
 
 	clientID := in.GetClientID()
@@ -272,19 +282,34 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 	// the clean type.
 	serverID := serverNameMap[serverName]
 
-	// serverList[serverID] <- send kill call to this
-	privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
+	if serverID == backend {
+		// serverList[serverID] <- send kill call to this
+		privateCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
 
-	// ServerInstance.conn is Read only -- hence, not protected by a lock
-	emptyMsg := new(emptypb.Empty)
-	_, err := serverList[serverID].conn.StopServer(privateCtx, emptyMsg)
+		// ServerInstance.conn is Read only -- hence, not protected by a lock
+		emptyMsg := new(emptypb.Empty)
+		_, err := backendConn.StopServer(privateCtx, emptyMsg)
 
-	// check it the server has exited, if not successCode = -1
-	if err != nil {
-		// TODO: Check if this will respond back in case the server has crashed
-		log.Printf("Error: %v\n", err)
-		return &pb.Response{Value: "", SuccessCode: -1}, errors.New("server stop failed")
+		// check it the server has exited, if not successCode = -1
+		if err != nil {
+			// TODO: Check if this will respond back in case the server has crashed
+			log.Printf("Error: %v\n", err)
+			return &pb.Response{Value: "", SuccessCode: -1}, errors.New("server stop failed")
+		}
+	} else {
+		// Send request to each of the slave routers so they can process it accordingly.
+		for i := 0; i < len(serverList); i++ {
+			if i == backend {
+				continue
+			}
+			_, err := serverList[i].routerConn.StopServer(context.Background(), &emptypb.Empty{})
+			if err != nil {
+				// TODO: Check if this will respond back in case the server has crashed
+				log.Printf("Error: %v\n", err)
+				return &pb.Response{Value: "", SuccessCode: -1}, errors.New("server stop failed")
+			}
+		}
 	}
 
 	// Change input server name status to unavailable globally as well
@@ -293,6 +318,7 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 		serverList[serverID].mode = -1
 		serverList[serverID].lock.Unlock()
 
+		// Start the server irrespective of whether the server is the current master's backend or not.
 		go StartServer(serverID)
 	}
 
@@ -368,14 +394,15 @@ func (lb *loadBalancer) FreeLBState(ctx context.Context, in *pb.StateRequest) (*
 }
 
 func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+	// Method executed by Master
 
 	// If call received here: then, this instance must be the Master. If not -- send error
 	if masterLB != backend {
 		return &pb.Response{Value: strconv.Itoa(masterLB), SuccessCode: 2}, errors.New("node not master")
 	}
 
+	// Following logic -- executed by the Master LB
 	var val string = ""
-
 	clientID := in.GetClientID()
 	// log.Printf("Object ID Received in Get: %v\n", clientID)
 
@@ -445,6 +472,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 }
 
 func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Response, error) {
+	// Method executed by Master
 
 	// If call received here: then, this instance must be the Master. If not -- send error
 	if masterLB != backend {
@@ -453,6 +481,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 	funcStart := time.Now()
 
+	// Following logic -- executed by the Master LB
 	var successCode int32 = 0
 	var val string = "NULL"
 
@@ -568,6 +597,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 }
 
 func (lb *loadBalancerInternal) MarkMe(ctx context.Context, in *pb.MarkStatus) (*pb.Ack, error) {
+	// Same method used by master as well as slave LBs
 	serverName := in.GetServerName()
 	updatedStatus := in.GetNewStatus()
 
@@ -618,6 +648,7 @@ func (lb *loadBalancerInternal) MarkMe(ctx context.Context, in *pb.MarkStatus) (
 }
 
 func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.ServerInfo) (*pb.AlivePeersResponse, error) {
+	// Method used by the corresponding LB of the server, acting as the router.
 	// COMPLETED: Any corner cases (or error handling) required here?
 	serverName := in.GetServerName()
 	serverID := serverNameMap[serverName]
