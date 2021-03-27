@@ -682,6 +682,24 @@ func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.Serv
 	return &pb.AlivePeersResponse{AliveList: aliveList}, nil
 }
 
+func (lb *loadBalancerInternal) GetValue(ctx context.Context, in *pb.InternalRequest) (*pb.InternalResponse, error) {
+	// Simply forward to the associated backend
+	resp, err := backendConn.GetValue(context.Background(), in)
+	return resp, err
+}
+
+func (lb *loadBalancerInternal) SetValue(ctx context.Context, in *pb.InternalRequest) (*pb.InternalResponse, error) {
+	// Simply forward to the associated backend
+	resp, err := backendConn.SetValue(context.Background(), in)
+	return resp, err
+}
+
+func (lb *loadBalancerInternal) StopServer(ctx context.Context, in *emptypb.Empty) (*emptypb.Empty, error) {
+	// Simply forward to the associated backend
+	resp, err := backendConn.StopServer(context.Background(), in)
+	return resp, err
+}
+
 // Takes two arguments
 // (index of the current node in the cluster config, num_nodes, master)
 // Read these arguments from a configuration file "cluster.json":
