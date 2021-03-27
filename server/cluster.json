@@ -1,0 +1,22 @@
+{
+    "servers" : [
+        {
+            "ip_addr" : "localhost",
+            "serv_port" : 50051,
+            "rec_port" : 50052,
+            "router_port" : 50053
+        },
+        {
+            "ip_addr" : "localhost",
+            "serv_port" : 50054,
+            "rec_port" : 50055,
+            "router_port" : 50056
+        },
+        {
+            "ip_addr" : "localhost",
+            "serv_port" : 50057,
+            "rec_port" : 50058,
+            "router_port" : 50059
+        }
+    ]
+}

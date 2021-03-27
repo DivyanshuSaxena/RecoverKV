@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
@@ -37,13 +39,32 @@ peer_list = initially everyone but this can change as client requests.
 */
 
 // Defines the port to run and total nodes in system
+// Also, defines the server tied with this load balancer
+// If masterLB = backend, then the current instance is the master
 var (
-	ip_port string
-	nodes   int
+	ip_port  string
+	nodes    int
+	backend  int
+	masterLB int
 )
 
+// NodeInfo read from the configuration
+type NodeInfo struct {
+	ipAddr     string `json:"ip_addr"`
+	servPort   int    `json:"serv_port"`
+	recPort    int    `json:"rec_port"`
+	routerPort int    `json:"router_port"`
+}
+
+// Configuration of the cluster read from the config file
+type Configuration struct {
+	servers []NodeInfo `json:"servers"`
+}
+
 // ServerInstance holds server states
-// serverID	- is the index of the server in the serverList
+// serverID		- is the index of the server in the serverList
+// conn			- the connection to the backend of the server (for restarting the server and sending PUTs/GETs for the backend)
+// routerConn	- the connection to the router of the server (for all PUT and GET requests)
 // mode 		- can take one of: 1: ALIVE, 0: ZOMBIE, -1: DEAD
 // lock 		- is a Mutex lock over the struct so that concurrent operations on the struct are safe.
 // 						Enforces mutual exclusion over mode and blockedPeers
@@ -51,6 +72,7 @@ type ServerInstance struct {
 	serverID     int
 	name         string
 	conn         pb.InternalClient
+	routerConn   pb.RecoverKVClient
 	recPort      string
 	mode         int32
 	blockedPeers []int
@@ -636,8 +658,10 @@ func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.Serv
 	return &pb.AlivePeersResponse{AliveList: aliveList}, nil
 }
 
-// Takes arguments
-// lb_ip_addr:port, num_nodes, node_1_ip:serverPort, node_2_ip:serverPort,...recPort1, recPort2,...
+// Takes two arguments
+// (index of the current node in the cluster config, num_nodes)
+// Read these arguments from a configuration file "cluster.json":
+// node_1_ip:serverPort, node_2_ip:serverPort,...recPort1, recPort2,...
 func main() {
 
 	rand.Seed(time.Now().UnixNano())
@@ -656,21 +680,32 @@ func main() {
 	// if they are alive or dead (dead being categorized by timeout or fail-stop)
 	// This makes sure we always make three conn (independent of number of client joining)
 	////////////////////////////////////////////////////
-	ip_port = os.Args[1]
+	backend, _ = strconv.Atoi(os.Args[1])
 	nodes, _ = strconv.Atoi(os.Args[2])
 
+	// Read the configuration file
+	file, _ := os.Open("conf.json")
+	defer file.Close()
+
+	bytes, _ := ioutil.ReadAll(file)
+	configuration := Configuration{}
+	err := json.Unmarshal(bytes, &configuration)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
 	// Populate node details
-	for i := 3; i < nodes+3; i++ {
-		address = append(address, os.Args[i])
+	for i := 0; i < nodes; i++ {
+		routerAddress := configuration.servers[i].ipAddr + ":" + strconv.Itoa(configuration.servers[i].routerPort)
+		address = append(address, routerAddress)
+		recPort = append(recPort, strconv.Itoa(configuration.servers[i].recPort))
 	}
-	for i := nodes + 3; i < len(os.Args); i++ {
-		recPort = append(recPort, os.Args[i])
-	}
-	serverList = make([]ServerInstance, nodes)
+
 	// Set up distinct connections to the servers.
+	serverList = make([]ServerInstance, nodes)
 	log.Printf("Num nodes: %v\n", nodes)
 	for i := 0; i < nodes; i++ {
-		// TODO: Should we run servers as entirely different processes?
+		// Start connection to the router of the respective server
 		name := address[i]
 		log.Printf("Server name: %v\n", name)
 
