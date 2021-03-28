@@ -17,6 +17,18 @@
             "servPort": 50057,
             "recPort": 50058,
             "routerPort": 50059
+        },
+        {
+            "ipAddr": "localhost",
+            "servPort": 50060,
+            "recPort": 50061,
+            "routerPort": 50062
+        },
+        {
+            "ipAddr": "localhost",
+            "servPort": 50063,
+            "recPort": 50064,
+            "routerPort": 50065
         }
     ]
 }

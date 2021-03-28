@@ -723,7 +723,7 @@ func main() {
 	log.SetFormatter(Formatter)
 
 	// Enable debug mode
-	log.SetLevel(log.DebugLevel)
+	// log.SetLevel(log.DebugLevel)
 
 	////////////////////////////////////////////////////
 	// Establish connection with all nodes and store a global mapping
