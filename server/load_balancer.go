@@ -65,13 +65,14 @@ type Configuration struct {
 
 // ServerInstance holds server states
 // serverID		- is the index of the server in the serverList
+// routerName	- ipAddr:routerPort of the server instance
 // routerConn	- the connection to the router of the server (for all PUT and GET requests)
 // mode 		- can take one of: 1: ALIVE, 0: ZOMBIE, -1: DEAD
 // lock 		- is a Mutex lock over the struct so that concurrent operations on the struct are safe.
 // 						Enforces mutual exclusion over mode and blockedPeers
 type ServerInstance struct {
 	serverID     int
-	name         string
+	routerName   string
 	routerConn   pb.InternalClient
 	recPort      string
 	mode         int32
@@ -96,7 +97,7 @@ var (
 	queryIDMu           = sync.Mutex{}
 	queryTimeMu         = sync.Mutex{}
 	clientMap           = make(clientMAP)
-	serverNameMap       = make(serverNameMAP)
+	serverNameMap       = make(serverNameMAP) // Client sends the name of the router
 	serverList    []ServerInstance
 	address       []string
 	recPort       []string
@@ -134,7 +135,7 @@ func CanContactServer(clientID string, serverName string) int {
 	found := 0
 	for _, allowedServerID := range clientData.servers {
 		// ServerInstance.name is Read Only -- hence, not needed to be protected by a lock
-		if serverName == serverList[allowedServerID].name {
+		if serverName == serverList[allowedServerID].routerName {
 			found = 1
 		}
 	}
@@ -142,31 +143,21 @@ func CanContactServer(clientID string, serverName string) int {
 	return found
 }
 
-// Deprecated: Redial redials connection to a dead server
-func Redial(serverID int) {
-	log.Println("Opening new connection: ", serverList[serverID].name)
-	// Update connection
-	conn, err := grpc.Dial(serverList[serverID].name, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v\n", err)
-	}
-	// NOTE: Incorrect connection here.
-	serverList[serverID].routerConn = pb.NewInternalClient(conn)
-}
-
 // StartServer startes the server with serverId given
 func StartServer(serverID int) {
 	server := serverList[serverID]
-	tmpList := strings.Split(server.name, ":")
+	tmpList := strings.Split(server.routerName, ":")
 	ipAddr := tmpList[0]
 	servPort := tmpList[1]
 
 	// Sleep to allow server exit
 	time.Sleep(time.Second)
 	tmp := strings.Split(ip_port, ":") // parse ip and port
+
+	// TODO: Update server start script
 	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort, tmp[0], tmp[1], "0")
 	cmd.Stdout = os.Stdout
-	log.Println("Started dead server ", server.name)
+	log.Println("Started dead server ", server.routerName)
 	err := cmd.Start()
 	if err != nil {
 		log.Fatal(err)
@@ -437,7 +428,25 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 		if serverID == backend {
 			// Send request to the attached backend Server
-			resp, _ := backendConn.GetValue(context.Background(), &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
+			resp, err := backendConn.GetValue(context.Background(), &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
+			if err != nil {
+				log.Printf("error while contacting backend %v: %v\n", serverID, err)
+				statusErr, _ := status.FromError(err)
+				log.Printf("%v %v\n", err, statusErr)
+
+				// If timed out, mark node as DEAD
+				if statusErr.Code() == codes.Unavailable {
+					log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].routerName)
+
+					serverList[serverID].lock.Lock()
+					serverList[serverID].mode = -1
+					serverList[serverID].lock.Unlock()
+
+					StartServer(serverID)
+				}
+				continue
+			}
+
 			log.Debug("GetValue Response: ", resp.GetValue())
 			return &pb.Response{Value: resp.GetValue(), SuccessCode: resp.GetSuccessCode()}, nil
 		}
@@ -445,13 +454,13 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		// ServerInstance.conn is Read only -- no lock needed for safety
 		resp, err := serverList[serverID].routerConn.GetValue(context.Background(), &pb.InternalRequest{QueryID: 0, Key: key, Value: val})
 		if err != nil {
-			log.Printf("error while contacting %v: %v\n", serverList[serverID].name, err)
+			log.Printf("error while contacting backend %v: %v\n", serverID, err)
 			statusErr, _ := status.FromError(err)
 			log.Printf("%v %v\n", err, statusErr)
 
 			// If timed out, mark node as DEAD
 			if statusErr.Code() == codes.Unavailable {
-				log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].name)
+				log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].routerName)
 
 				serverList[serverID].lock.Lock()
 				serverList[serverID].mode = -1
@@ -540,7 +549,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 					if err != nil {
 						statusErr, _ := status.FromError(err)
-						log.Printf("error while contacting %v: %v || Code: %v\n", serverList[id].name, err, statusErr.Code())
+						log.Printf("error while contacting %v: %v || Code: %v\n", serverList[id].routerName, err, statusErr.Code())
 
 						// If timed out, mark node as DEAD
 						if statusErr.Code() == codes.Unavailable {
@@ -569,7 +578,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		// log.Printf("Received in channel in %s", chanElapsed)
 		if st.act == "start" {
 			serverID := st.serverID
-			log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].name)
+			log.Printf("Code unavailable while contacting server %v\n", serverList[serverID].routerName)
 
 			serverList[serverID].lock.Lock()
 			serverList[serverID].mode = -1
@@ -655,8 +664,8 @@ func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.Serv
 
 	var aliveList string = ""
 	// Iterate over all servers, and append into a string
-	// Concurrency safety -- execute the block with a lock over the ServerInstance Object
-	serverList[serverID].lock.Lock()
+	// TODO: Remove - Concurrency safety -- execute the block with a lock over the ServerInstance Object
+	// serverList[serverID].lock.Lock()
 	for _, peerInstance := range serverList {
 		if peerInstance.mode == 1 {
 			// Server is alive. Check if it is not in blockedPeers
@@ -668,16 +677,17 @@ func (lb *loadBalancerInternal) FetchAlivePeers(ctx context.Context, in *pb.Serv
 			}
 
 			// If not found - Add to Alive list
+			recoveryAddress := strings.Split(peerInstance.routerName, ":")[0] + ":" + peerInstance.recPort
 			if !found {
 				if len(aliveList) == 0 {
-					aliveList = aliveList + peerInstance.name
+					aliveList = aliveList + recoveryAddress
 				} else {
-					aliveList = aliveList + "," + peerInstance.name
+					aliveList = aliveList + "," + recoveryAddress
 				}
 			}
 		}
 	}
-	serverList[serverID].lock.Unlock()
+	// serverList[serverID].lock.Unlock()
 
 	return &pb.AlivePeersResponse{AliveList: aliveList}, nil
 }
@@ -753,7 +763,7 @@ func main() {
 		log.Printf("Server name: %v\n", name)
 
 		// Save into global data structures
-		serverNameMap[name] = i
+		serverNameMap[address[i]] = i
 
 		if i == backend {
 			// Create the backend connection
@@ -765,7 +775,7 @@ func main() {
 
 			backendConn = pb.NewInternalClient(conn)
 			log.Printf("Added server id %v\n", i)
-			s := ServerInstance{serverID: i, name: name, recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
+			s := ServerInstance{serverID: i, routerName: address[i], recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
 			serverList[i] = s
 			continue
 		}
@@ -779,7 +789,7 @@ func main() {
 
 		c := pb.NewInternalClient(conn)
 		log.Printf("Added server id %v\n", i)
-		s := ServerInstance{serverID: i, name: name, routerConn: c, recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
+		s := ServerInstance{serverID: i, routerName: address[i], routerConn: c, recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
 		serverList[i] = s
 
 		// If i is the master, create the masterConn

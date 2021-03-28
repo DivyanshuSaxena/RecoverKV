@@ -3,18 +3,22 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"os"
 	pb "recoverKV/gen/recoverKV"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 var ip_addr string
@@ -30,11 +34,10 @@ var db_path string
 
 // Refer persist.go for log path
 
-//var LB pb.UnimplementedInternalClient
-var LB pb.InternalClient
-
-// setter and getter for the mode can be helpful for LB
-var server_mode string // 3 modes, DEAD->ZOMBIE->ALIVE
+var (
+	LB          pb.InternalClient // LB pb.UnimplementedInternalClient
+	server_mode string            // 3 modes, DEAD->ZOMBIE->ALIVE
+)
 
 // BigMAP is the type for the (key-value) pairs table
 type BigMAP map[string]string
@@ -48,6 +51,19 @@ var db *sql.DB
 // server is used to implement RecoverKV service.
 type server struct {
 	pb.UnimplementedInternalServer
+}
+
+// NodeInfo read from the configuration
+type NodeInfo struct {
+	ipAddr     string `json:"ip_addr"`
+	servPort   int    `json:"serv_port"`
+	recPort    int    `json:"rec_port"`
+	routerPort int    `json:"router_port"`
+}
+
+// Configuration of the cluster read from the config file
+type Configuration struct {
+	servers []NodeInfo `json:"servers"`
 }
 
 // GetValue implements RecoverKV.GetValue
@@ -242,7 +258,7 @@ func MarkMe(status int32) (int64, error) {
 	privateCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	log.Infof("MarkMe: Sending RPC for %v\n", ip_serv_port)
-	resp, err := LB.MarkMe(privateCtx, &pb.MarkStatus{ServerName: ip_serv_port, NewStatus: status})
+	resp, err := LB.MarkMe(privateCtx, &pb.MarkStatus{ServerName: ip_lb_port, NewStatus: status})
 	if err != nil || privateCtx.Err() == context.DeadlineExceeded {
 		log.Info("[Recovery] MarkMe failed during recovery!", err)
 		return 0, err
@@ -364,26 +380,43 @@ func recoveryStage() {
 	}
 }
 
-// Takes 5 arguments
+// Takes one argument:
+// (index of the current node in the cluster config)
+// These arguments can be read from the cluster config file:
 // ip address, serve port, recovery port, LB ip addr, LB port
 func main() {
 	//fmt.Println("Starting server execution")
 	server_mode = "DEAD"
 	rand.Seed(time.Now().Unix())
-	//parse arguments -- Not checking, pray user passed correctly!
+
+	// parse arguments -- Not checking, pray user passed correctly!
 	// server_id = os.Args[1]  // Not needed as the load balancer has its own server ids
-	ip_addr = os.Args[1]
-	serv_port = os.Args[2]
-	rec_port = os.Args[3]
+	serverID, _ := strconv.Atoi(os.Args[1])
+
+	// Read the configuration file
+	file, _ := os.Open("conf.json")
+	defer file.Close()
+
+	bytes, _ := ioutil.ReadAll(file)
+	configuration := Configuration{}
+	err := json.Unmarshal(bytes, &configuration)
+	if err != nil {
+		fmt.Println("error:", err)
+	}
+
+	server_config := configuration.servers[serverID]
+	ip_addr = server_config.ipAddr
+	serv_port = strconv.Itoa(server_config.servPort)
+	rec_port = strconv.Itoa(server_config.recPort)
 	ip_serv_port = ip_addr + ":" + serv_port
 	ip_rec_port = ip_addr + ":" + rec_port
-	lb_ip_addr = os.Args[4]
-	lb_port = os.Args[5]
+	lb_ip_addr = server_config.ipAddr
+	lb_port = strconv.Itoa(server_config.routerPort)
 	ip_lb_port = lb_ip_addr + ":" + lb_port
 
 	db_path = "/tmp/" + serv_port
 	// If the file doesn't exist, create it or append to the file
-	file, err := os.OpenFile("server"+serv_port+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	file, err = os.OpenFile("server"+serv_port+".log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
 		log.Fatal(err)
 	}
