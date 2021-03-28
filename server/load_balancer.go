@@ -52,15 +52,15 @@ var (
 
 // NodeInfo read from the configuration
 type NodeInfo struct {
-	ipAddr     string `json:"ip_addr"`
-	servPort   int    `json:"serv_port"`
-	recPort    int    `json:"rec_port"`
-	routerPort int    `json:"router_port"`
+	IpAddr     string `json:"ipAddr"`
+	ServPort   int    `json:"servPort"`
+	RecPort    int    `json:"recPort"`
+	RouterPort int    `json:"routerPort"`
 }
 
 // Configuration of the cluster read from the config file
 type Configuration struct {
-	servers []NodeInfo `json:"servers"`
+	Servers []NodeInfo `json:"servers"`
 }
 
 // ServerInstance holds server states
@@ -74,6 +74,7 @@ type ServerInstance struct {
 	serverID     int
 	routerName   string
 	routerConn   pb.InternalClient
+	servPort     string
 	recPort      string
 	mode         int32
 	blockedPeers []int
@@ -101,6 +102,7 @@ var (
 	serverList    []ServerInstance
 	address       []string
 	recPort       []string
+	servPort      []string
 )
 
 type loadBalancer struct {
@@ -146,16 +148,13 @@ func CanContactServer(clientID string, serverName string) int {
 // StartServer startes the server with serverId given
 func StartServer(serverID int) {
 	server := serverList[serverID]
-	tmpList := strings.Split(server.routerName, ":")
-	ipAddr := tmpList[0]
-	servPort := tmpList[1]
 
 	// Sleep to allow server exit
 	time.Sleep(time.Second)
-	tmp := strings.Split(ip_port, ":") // parse ip and port
+	// tmp := strings.Split(ip_port, ":") // parse ip and port
 
 	// TODO: Update server start script
-	cmd := exec.Command("./run_server.sh", ipAddr, servPort, server.recPort, tmp[0], tmp[1], "0")
+	cmd := exec.Command("./run_server.sh", strconv.Itoa(serverID), server.servPort, "0")
 	cmd.Stdout = os.Stdout
 	log.Println("Started dead server ", server.routerName)
 	err := cmd.Start()
@@ -249,7 +248,7 @@ func (lb *loadBalancer) StopServer(ctx context.Context, in *pb.KillRequest) (*pb
 
 	// If call received here: then, this instance must be the Master. If not -- send error
 	if masterLB != backend {
-		return &pb.Response{Value: strconv.Itoa(masterLB), SuccessCode: 2}, errors.New("node not master")
+		return &pb.Response{Value: serverList[masterLB].routerName, SuccessCode: 2}, errors.New("node not master")
 	}
 
 	// Following logic -- executed by the Master LB
@@ -389,7 +388,7 @@ func (lb *loadBalancer) GetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 	// If call received here: then, this instance must be the Master. If not -- send error
 	if masterLB != backend {
-		return &pb.Response{Value: strconv.Itoa(masterLB), SuccessCode: 2}, errors.New("node not master")
+		return &pb.Response{Value: serverList[masterLB].routerName, SuccessCode: 2}, errors.New("node not master")
 	}
 
 	// Following logic -- executed by the Master LB
@@ -485,7 +484,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 
 	// If call received here: then, this instance must be the Master. If not -- send error
 	if masterLB != backend {
-		return &pb.Response{Value: strconv.Itoa(masterLB), SuccessCode: 2}, errors.New("node not master")
+		return &pb.Response{Value: serverList[masterLB].routerName, SuccessCode: 2}, errors.New("node not master")
 	}
 
 	funcStart := time.Now()
@@ -724,7 +723,7 @@ func main() {
 	log.SetFormatter(Formatter)
 
 	// Enable debug mode
-	// log.SetLevel(log.DebugLevel)
+	log.SetLevel(log.DebugLevel)
 
 	////////////////////////////////////////////////////
 	// Establish connection with all nodes and store a global mapping
@@ -737,21 +736,21 @@ func main() {
 	masterLB, _ = strconv.Atoi(os.Args[3])
 
 	// Read the configuration file
-	file, _ := os.Open("conf.json")
+	file, _ := os.Open("cluster.json")
 	defer file.Close()
 
 	bytes, _ := ioutil.ReadAll(file)
-	configuration := Configuration{}
-	err := json.Unmarshal(bytes, &configuration)
-	if err != nil {
-		fmt.Println("error:", err)
-	}
+
+	var configuration Configuration
+	json.Unmarshal(bytes, &configuration)
+	fmt.Printf("%v\n", configuration)
 
 	// Populate node details
 	for i := 0; i < nodes; i++ {
-		routerAddress := configuration.servers[i].ipAddr + ":" + strconv.Itoa(configuration.servers[i].routerPort)
+		routerAddress := configuration.Servers[i].IpAddr + ":" + strconv.Itoa(configuration.Servers[i].RouterPort)
 		address = append(address, routerAddress)
-		recPort = append(recPort, strconv.Itoa(configuration.servers[i].recPort))
+		recPort = append(recPort, strconv.Itoa(configuration.Servers[i].RecPort))
+		servPort = append(servPort, strconv.Itoa(configuration.Servers[i].ServPort))
 	}
 
 	// Set up distinct connections to the servers.
@@ -759,14 +758,17 @@ func main() {
 	log.Printf("Num nodes: %v\n", nodes)
 	for i := 0; i < nodes; i++ {
 		// Start connection to the router of the respective server
-		name := configuration.servers[i].ipAddr + ":" + strconv.Itoa(configuration.servers[i].servPort)
-		log.Printf("Server name: %v\n", name)
+		log.Printf("Server name: %v\n", address[i])
 
 		// Save into global data structures
 		serverNameMap[address[i]] = i
 
 		if i == backend {
+			// Get the port to run LB on
+			ip_port = address[i]
+
 			// Create the backend connection
+			name := configuration.Servers[i].IpAddr + ":" + strconv.Itoa(configuration.Servers[i].ServPort)
 			conn, err := grpc.Dial(name, grpc.WithInsecure())
 			if err != nil {
 				log.Fatalf("Could not connect: %v\n", err)
@@ -775,7 +777,7 @@ func main() {
 
 			backendConn = pb.NewInternalClient(conn)
 			log.Printf("Added server id %v\n", i)
-			s := ServerInstance{serverID: i, routerName: address[i], recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
+			s := ServerInstance{serverID: i, routerName: address[i], recPort: recPort[i], servPort: servPort[i], mode: 0, lock: sync.Mutex{}}
 			serverList[i] = s
 			continue
 		}
@@ -789,13 +791,13 @@ func main() {
 
 		c := pb.NewInternalClient(conn)
 		log.Printf("Added server id %v\n", i)
-		s := ServerInstance{serverID: i, routerName: address[i], routerConn: c, recPort: recPort[i], mode: 0, lock: sync.Mutex{}}
+		s := ServerInstance{serverID: i, routerName: address[i], routerConn: c, recPort: recPort[i], servPort: servPort[i], mode: 0, lock: sync.Mutex{}}
 		serverList[i] = s
 
 		// If i is the master, create the masterConn
-		if i == masterLB {
+		if i == masterLB && masterLB != backend {
 			// Create the connection to the master
-			masterAddress := configuration.servers[i].ipAddr + ":" + strconv.Itoa(configuration.servers[i].routerPort)
+			masterAddress := configuration.Servers[i].IpAddr + ":" + strconv.Itoa(configuration.Servers[i].RouterPort)
 			conn, err := grpc.Dial(masterAddress, grpc.WithInsecure())
 			if err != nil {
 				log.Fatalf("Could not connect: %v\n", err)

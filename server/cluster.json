@@ -1,22 +1,22 @@
 {
-    "servers" : [
+    "servers": [
         {
-            "ip_addr" : "localhost",
-            "serv_port" : 50051,
-            "rec_port" : 50052,
-            "router_port" : 50053
+            "ipAddr": "localhost",
+            "servPort": 50051,
+            "recPort": 50052,
+            "routerPort": 50053
         },
         {
-            "ip_addr" : "localhost",
-            "serv_port" : 50054,
-            "rec_port" : 50055,
-            "router_port" : 50056
+            "ipAddr": "localhost",
+            "servPort": 50054,
+            "recPort": 50055,
+            "routerPort": 50056
         },
         {
-            "ip_addr" : "localhost",
-            "serv_port" : 50057,
-            "rec_port" : 50058,
-            "router_port" : 50059
+            "ipAddr": "localhost",
+            "servPort": 50057,
+            "recPort": 50058,
+            "routerPort": 50059
         }
     ]
 }

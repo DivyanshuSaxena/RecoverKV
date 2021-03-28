@@ -39,7 +39,7 @@ client.o: client.cc
 test: correctness_test performance_test multiperf_test
 
 performance_test: tests/performance_test.cc
-	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@
+	$(CXX) $(CXXFLAGS) $< -L. -l739kv -Wl,-rpath=. -o $@ -g
 
 multiperf_test: tests/multiperf_test.cc
 	$(CXX) $(CXXFLAGS) $< -L. $(THFLAGS) -l739kv -Wl,-rpath=. -o $@

@@ -22,6 +22,14 @@ int RecoverKVClient::getValue(char *client_id, char *key, char *value)
         {
             copy(response.value().begin(), response.value().end(), value);
             value[response.value().size()] = '\0';
+        } else if (successCode == 2)
+        {
+            // retry the call
+            char* newServer = new char[1000];
+            copy(response.value().begin(), response.value().end(), newServer);
+            newServer[response.value().size()] = '\0';
+            renew_stub(newServer);
+            return getValue(client_id, key, value);
         }
 
         return successCode;
@@ -57,6 +65,14 @@ int RecoverKVClient::setValue(char *client_id, char *key, char *value, char *old
         {
             copy(response.value().begin(), response.value().end(), old_value);
             old_value[response.value().size()] = '\0';
+        } else if (successCode == 2)
+        {
+            // retry the call
+            char* newServer = new char[1000];
+            copy(response.value().begin(), response.value().end(), newServer);
+            newServer[response.value().size()] = '\0';
+            renew_stub(newServer);
+            return setValue(client_id, key, value, old_value);
         }
 
         return successCode;
@@ -170,7 +186,7 @@ KV739Client::KV739Client()
     client_id = NULL;
 
     // Hardcode load balancer address
-    lb_addr = "localhost:50050";
+    lb_addr = "localhost:50053";
 
     // grpc handler
     client = new RecoverKVClient(
@@ -183,6 +199,11 @@ KV739Client::~KV739Client()
 
     delete client;
     client = NULL;
+}
+
+void RecoverKVClient::renew_stub(char* addr) {
+    // update grpc handler
+    stub_ = RecoverKV::NewStub(grpc::CreateChannel(addr, grpc::InsecureChannelCredentials()));
 }
 
 // Establish grpc connection with the load balancer

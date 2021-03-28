@@ -55,15 +55,15 @@ type server struct {
 
 // NodeInfo read from the configuration
 type NodeInfo struct {
-	ipAddr     string `json:"ip_addr"`
-	servPort   int    `json:"serv_port"`
-	recPort    int    `json:"rec_port"`
-	routerPort int    `json:"router_port"`
+	IpAddr     string `json:"ipAddr"`
+	ServPort   int    `json:"servPort"`
+	RecPort    int    `json:"recPort"`
+	RouterPort int    `json:"routerPort"`
 }
 
 // Configuration of the cluster read from the config file
 type Configuration struct {
-	servers []NodeInfo `json:"servers"`
+	Servers []NodeInfo `json:"servers"`
 }
 
 // GetValue implements RecoverKV.GetValue
@@ -394,24 +394,25 @@ func main() {
 	serverID, _ := strconv.Atoi(os.Args[1])
 
 	// Read the configuration file
-	file, _ := os.Open("conf.json")
+	file, _ := os.Open("cluster.json")
 	defer file.Close()
 
 	bytes, _ := ioutil.ReadAll(file)
-	configuration := Configuration{}
+	var configuration Configuration
 	err := json.Unmarshal(bytes, &configuration)
 	if err != nil {
 		fmt.Println("error:", err)
 	}
+	fmt.Printf("%v\n", configuration)
 
-	server_config := configuration.servers[serverID]
-	ip_addr = server_config.ipAddr
-	serv_port = strconv.Itoa(server_config.servPort)
-	rec_port = strconv.Itoa(server_config.recPort)
+	server_config := configuration.Servers[serverID]
+	ip_addr = server_config.IpAddr
+	serv_port = strconv.Itoa(server_config.ServPort)
+	rec_port = strconv.Itoa(server_config.RecPort)
 	ip_serv_port = ip_addr + ":" + serv_port
 	ip_rec_port = ip_addr + ":" + rec_port
-	lb_ip_addr = server_config.ipAddr
-	lb_port = strconv.Itoa(server_config.routerPort)
+	lb_ip_addr = server_config.IpAddr
+	lb_port = strconv.Itoa(server_config.RouterPort)
 	ip_lb_port = lb_ip_addr + ":" + lb_port
 
 	db_path = "/tmp/" + serv_port

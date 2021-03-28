@@ -160,12 +160,12 @@ int main(int argc, char *argv[]) {
   int tests_passed = 0;
   int total_servers = 0;
 
-  if (argc < 4) {
-    cout << "Format: ./performance_test <num-keys> <ip-addr:port of atleast "
-            "two servers"
-         << endl;
-    return 0;
-  }
+  // if (argc < 4) {
+  //   cout << "Format: ./performance_test <num-keys> <ip-addr:port of atleast "
+  //           "two servers"
+  //        << endl;
+  //   return 0;
+  // }
 
   // get the number of keys from the command line
   int num_keys = atoi(argv[1]);
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
   client->kv739_shutdown();
 
   // cleanup
-  for (int i = 0; i < argc; i++) delete serverNames[i];
+  for (int i = 0; i < argc - 1; i++) delete serverNames[i];
   delete serverNames;
   delete client;
 

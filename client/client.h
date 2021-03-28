@@ -26,6 +26,8 @@ public:
 
     RecoverKVClient(std::shared_ptr<Channel> channel) : stub_(RecoverKV::NewStub(channel)) {}
 
+    void renew_stub(char* addr);
+
     int getValue(char *client_id, char *key, char *value);
     int setValue(char *client_id, char *key, char *value, char *old_value);
 
@@ -45,7 +47,6 @@ class KV739Client
 public:
 
     KV739Client();
-
     ~KV739Client();
 
     int kv739_init(char **server_names);
