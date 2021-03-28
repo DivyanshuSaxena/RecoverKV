@@ -136,13 +136,13 @@ int main(int argc, char *argv[]) {
   int pool_size = atoi(argv[2]);
 
   // get server names from command line
-  char **serverNames = new char *[argc - 1];
+  char **serverNames = new char *[argc - 2];
   for (int i = 3; i < argc; i++) {
     serverNames[i - 3] = new char[strlen(argv[i])];
     total_servers++;
     strncpy(serverNames[i - 3], argv[i], strlen(argv[i]));
   }
-  serverNames[argc - 2] = NULL;
+  serverNames[argc - 3] = NULL;
   cout << "Created server name list" << endl;
 
   // construct clients for each thread

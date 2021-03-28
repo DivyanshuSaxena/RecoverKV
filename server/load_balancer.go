@@ -487,7 +487,7 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 		return &pb.Response{Value: serverList[masterLB].routerName, SuccessCode: 2}, errors.New("node not master")
 	}
 
-	funcStart := time.Now()
+	// funcStart := time.Now()
 
 	// Following logic -- executed by the Master LB
 	var successCode int32 = 0
@@ -591,9 +591,9 @@ func (lb *loadBalancer) SetValue(ctx context.Context, in *pb.Request) (*pb.Respo
 			successCode = st.code
 		}
 	}
-	funcElapsed := time.Since(funcStart)
-	writeString := fmt.Sprintf("%v\n", funcElapsed)
-	queryFile.WriteString(writeString)
+	// funcElapsed := time.Since(funcStart)
+	// writeString := fmt.Sprintf("%v\n", funcElapsed)
+	// queryFile.WriteString(writeString)
 
 	log.Debugf("SetValue successful puts: %v\n", successfulPuts)
 	if successfulPuts > 0 {
@@ -810,8 +810,8 @@ func main() {
 	}
 
 	// Open file for writing
-	queryFile, _ = os.Create("/tmp/" + ip_port)
-	defer queryFile.Close()
+	// queryFile, _ = os.Create("/tmp/" + ip_port)
+	// defer queryFile.Close()
 
 	// Start the load balancer and listen for requests
 	lis, err := net.Listen("tcp", ip_port)
