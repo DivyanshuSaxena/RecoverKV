@@ -1,7 +1,23 @@
 # RecoverKV
 A strongly consistent distributed KV store.
 
-## Instructions for Partner team
+## Design
+
+RecoverKV is designed and implemented to be strongly-consistent in both failure and non-failure cases, provided that there is no partition.  
+
+RecoverKV uses a quorum protocol where `R=1` and `W=N` hence, `R+W > N`. Writes go to all the servers, while reads can be done on any one server.
+Each server maintains an in-memory map which is used for fast look-ups and also logs updates to the key-value pairs in a SQLite3 table, which is used for recovery.
+
+Writes to the servers are managed by a load balancer which ensures the writes are always in order by assigning every write query a unique id (uid).
+These immutable objects are maintained in an unordered log at each server. These logs serve as the backbone for our consistent recovery procedure.
+
+For more details, please check the reports for this project. These reports document the incremental changes to the KV Store:
+
+- Durability [Report](docs/739_recoverKV_report1.pdf)
+- Strong consistency and High Availability [Report](docs/739_recoverKV_report2.pdf)
+- System design to counter Load Balancer failures [Report](docs/739_recoverKV_report3.pdf)
+
+## Instructions for running the KV store
 
 ### Starting load balancer and servers
 
@@ -24,7 +40,7 @@ cd server
 # start a server
 ./run_server.sh <server ip> <server port> <recovery port> <LB ip> <LB port> 1
 
-# #Example Usage: For starting three servers on localhost
+# Example Usage: For starting three servers on localhost
 ./run_server.sh localhost 50051 50054 localhost 50050 1
 ./run_server.sh localhost 50052 50055 localhost 50050 1
 ./run_server.sh localhost 50053 50056 localhost 50050 1
@@ -32,7 +48,7 @@ cd server
 # Then start the load balancer
 ./recoverLB <ip_addr:port> <number of servers> <server 1 ip:port> <server 2 ip:port> ... <server 1s recovery port> <server 2s recovery port> ...
 
-## Example Usage: (with respect to above started servers)
+# Example Usage: (with respect to above started servers)
 ./recoverLB localhost:50050 3 localhost:50051 localhost:50052 localhost:50053 50054 50055 50056
 
 ```
@@ -113,7 +129,7 @@ Additionally, the server also maintains some logs in the `server/server.log` dir
 
 Run `make test` inside the `client/` directory to generate testing executables. We provide one correctness and two performance tests.
 
-### Performance tests
+### Performance Tests
 
 After starting server instance, conduct the performance tests:
 
@@ -133,7 +149,7 @@ The other performance test is to measure the service throughput in situation of 
 
 e.g `./multiperf_test 127.0.0.1:50051 10000 4`
 
-### Correctness test
+### Correctness Test
 
 After starting server instance, conduct the correctness tests:
 
