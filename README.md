@@ -13,9 +13,9 @@ These immutable objects are maintained in an unordered log at each server. These
 
 For more details, please check the reports for this project. These reports document the incremental changes to the KV Store:
 
-- Durability [Report](docs/739_recoverKV_report1.pdf)
-- Strong consistency and High Availability [Report](docs/739_recoverKV_report2.pdf)
-- System design to counter Load Balancer failures [Report](docs/739_recoverKV_report3.pdf)
+- Durability [Report](docs/739_RecoverKV_report1.pdf)
+- Strong consistency and High Availability [Report](docs/739_RecoverKV_report2.pdf)
+- System design to counter Load Balancer failures [Report](docs/739_RecoverKV_report3.pdf)
 
 ## Instructions for running the KV store
 
